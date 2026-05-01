@@ -96,8 +96,8 @@ h2 small { font-size: 17px; font-weight: 600; color: #91a6c4; }
 .quote-status { display: block; margin-top: 8px; color: #8aa0bd; }
 .price small { display: block; margin-top: 6px; color: #7890ad; }
 .app-nav { display: grid; gap: 8px; }
-.app-nav button { width: 100%; border: 1px solid rgba(90,119,156,.22); background: rgba(255,255,255,.025); color: #adc0d8; border-radius: 14px; padding: 10px 12px; text-align: left; font-weight: 800; }
-.app-nav button:hover, .app-nav button.active { color: #f8fbff; border-color: rgba(74,222,128,.42); background: rgba(74,222,128,.09); }
+.app-nav a { width: 100%; border: 1px solid rgba(90,119,156,.22); background: rgba(255,255,255,.025); color: #adc0d8; border-radius: 14px; padding: 10px 12px; text-align: left; font-weight: 800; text-decoration: none; display: block; }
+.app-nav a:hover, .app-nav a.active { color: #f8fbff; border-color: rgba(74,222,128,.42); background: rgba(74,222,128,.09); }
 .timeframes { display: flex; gap: 8px; margin-top: 16px; }
 .timeframes button { border: 1px solid rgba(90,119,156,.24); background: rgba(255,255,255,.025); color: #91a6c4; border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 900; }
 .timeframes button.active { color: #061014; background: #4ade80; border-color: #4ade80; }

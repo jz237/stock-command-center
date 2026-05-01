@@ -26,6 +26,8 @@ type PortfolioSeed = {
 
 type View = 'dashboard' | 'stock' | 'portfolio' | 'research' | 'news' | 'settings'
 
+const viewIds = ['dashboard', 'stock', 'portfolio', 'research', 'news', 'settings'] as const
+
 type PositionWithStock = PortfolioSeed['positions'][number] & { stock: Stock }
 
 const fallbackStocks: Stock[] = [
@@ -95,14 +97,21 @@ const news = [
   { tag: 'Software', title: 'Enterprise AI budgets are shifting from pilots to production workloads', impact: 'MSFT and PLTR benefit if conversion holds', time: '3h ago' },
 ]
 
-const navItems: { id: View; label: string }[] = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'stock', label: 'Stock Detail' },
-  { id: 'portfolio', label: 'Portfolio' },
-  { id: 'research', label: 'Research' },
-  { id: 'news', label: 'News' },
-  { id: 'settings', label: 'Settings' },
+const navItems: { id: View; label: string; href: string }[] = [
+  { id: 'dashboard', label: 'Dashboard', href: '#dashboard' },
+  { id: 'stock', label: 'Stock Detail', href: '#stock' },
+  { id: 'portfolio', label: 'Portfolio', href: '#portfolio' },
+  { id: 'research', label: 'Research', href: '#research' },
+  { id: 'news', label: 'News', href: '#news' },
+  { id: 'settings', label: 'Settings', href: '#settings' },
 ]
+
+function parseHash() {
+  const raw = window.location.hash.replace(/^#/, '')
+  const [viewPart, symbolPart] = raw.split('/')
+  const view = viewIds.includes(viewPart as View) ? viewPart as View : 'dashboard'
+  return { view, symbol: symbolPart?.toUpperCase() }
+}
 
 const heatmapSizes: Record<string, number> = {
   NVDA: 20, AVGO: 15, MSFT: 13, AMZN: 12, GOOG: 11, META: 10, TSM: 10, ARM: 8, INTC: 8, QCOM: 7, PLTR: 7, VRT: 7,
@@ -124,6 +133,17 @@ function App() {
   const [selectedSymbol, setSelectedSymbol] = useState('NVDA')
   const [activeView, setActiveView] = useState<View>('dashboard')
   const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    const applyRoute = () => {
+      const route = parseHash()
+      setActiveView(route.view)
+      if (route.symbol) setSelectedSymbol(route.symbol)
+    }
+    applyRoute()
+    window.addEventListener('hashchange', applyRoute)
+    return () => window.removeEventListener('hashchange', applyRoute)
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -163,8 +183,7 @@ function App() {
     if (!raw) return
     const existing = stocks.find((stock) => stock.symbol === raw)
     if (existing) {
-      setSelectedSymbol(existing.symbol)
-      setActiveView('stock')
+      selectStock(existing.symbol)
       setQuery('')
       return
     }
@@ -184,15 +203,22 @@ function App() {
     }
     const next = [...stocks, generated]
     setStocks(next)
-    setSelectedSymbol(raw)
-    setActiveView('stock')
+    selectStock(raw)
     localStorage.setItem('commandCenterWatchlist', JSON.stringify(next.filter((stock) => !fallbackStocks.some((seed) => seed.symbol === stock.symbol))))
     setQuery('')
+  }
+
+  function goToView(view: View) {
+    setActiveView(view)
+    const nextHash = `#${view}`
+    if (window.location.hash !== nextHash) window.location.hash = nextHash
   }
 
   function selectStock(symbol: string, view: View = 'stock') {
     setSelectedSymbol(symbol)
     setActiveView(view)
+    const nextHash = view === 'stock' ? `#stock/${symbol}` : `#${view}`
+    if (window.location.hash !== nextHash) window.location.hash = nextHash
   }
 
   const ChartPanel = ({ expanded = false }: { expanded?: boolean }) => (
@@ -283,7 +309,7 @@ function App() {
     <main className="shell">
       <aside className="sidebar panel">
         <div className="brand"><span className="logo">▲</span><div><strong>Stock Command</strong><small>Market intelligence desk</small></div></div>
-        <nav className="app-nav" aria-label="App sections">{navItems.map((item) => <button key={item.id} onClick={() => setActiveView(item.id)} className={activeView === item.id ? 'active' : ''}>{item.label}</button>)}</nav>
+        <nav className="app-nav" aria-label="App sections">{navItems.map((item) => <a key={item.id} href={item.id === 'stock' ? `#stock/${selected.symbol}` : item.href} onClick={() => goToView(item.id)} className={activeView === item.id ? 'active' : ''}>{item.label}</a>)}</nav>
         <label className="search"><span>Search / add ticker</span><div><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTicker()} placeholder="NVDA, Microsoft, ARM..."/><button onClick={addTicker}>Add</button></div></label>
         <div className="watchlist">
           <div className="section-title">Watchlist</div>
