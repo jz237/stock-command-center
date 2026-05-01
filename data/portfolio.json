@@ -1,0 +1,9 @@
+{
+  "cash": 18420,
+  "positions": [
+    { "symbol": "NVDA", "shares": 18, "avgCost": 742 },
+    { "symbol": "MSFT", "shares": 24, "avgCost": 318 },
+    { "symbol": "AVGO", "shares": 8, "avgCost": 936 },
+    { "symbol": "TSM", "shares": 40, "avgCost": 112 }
+  ]
+}

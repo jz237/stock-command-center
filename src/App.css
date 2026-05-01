@@ -1,0 +1,95 @@
+:root {
+  color: #dbeafe;
+  background: #050b12;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 20% 0%, rgba(109,93,252,.18), transparent 28%), radial-gradient(circle at 78% 18%, rgba(74,222,128,.13), transparent 28%), #050b12; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 310px minmax(560px, 1fr) 360px;
+  gap: 18px;
+  padding: 18px;
+}
+
+.panel {
+  background: linear-gradient(180deg, rgba(13,23,34,.92), rgba(8,15,25,.88));
+  border: 1px solid rgba(90, 119, 156, .24);
+  border-radius: 24px;
+  box-shadow: 0 24px 80px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04);
+  backdrop-filter: blur(18px);
+}
+
+.sidebar { padding: 18px; display: flex; flex-direction: column; gap: 18px; position: sticky; top: 18px; height: calc(100vh - 36px); }
+.brand { display: flex; gap: 12px; align-items: center; }
+.logo { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 14px; color: #4ade80; background: rgba(74,222,128,.12); border: 1px solid rgba(74,222,128,.35); }
+.brand strong { display:block; font-size: 18px; }
+.brand small, small { color: #7890ad; }
+
+.search span, .section-title, .eyebrow { text-transform: uppercase; color: #7f94b3; letter-spacing: .12em; font-size: 11px; font-weight: 800; }
+.search div { margin-top: 8px; display: flex; gap: 8px; }
+.search input { min-width: 0; flex: 1; background: #07111d; color: #e5f1ff; border: 1px solid #21344c; border-radius: 14px; padding: 12px; outline: none; }
+.search input:focus { border-color: #6d5dfc; box-shadow: 0 0 0 4px rgba(109,93,252,.14); }
+.search button, .primary { border: 0; color: white; background: linear-gradient(135deg, #6d5dfc, #36d399); border-radius: 14px; padding: 0 14px; font-weight: 800; }
+
+.watchlist { overflow: auto; padding-right: 4px; }
+.watch { width: 100%; display: grid; grid-template-columns: 1fr 96px 58px; gap: 10px; align-items: center; margin-top: 10px; border: 1px solid transparent; border-radius: 18px; padding: 12px; background: rgba(255,255,255,.025); color: #dbeafe; text-align: left; }
+.watch:hover, .watch.active { border-color: rgba(74,222,128,.42); background: rgba(74,222,128,.08); }
+.watch small { display:block; max-width: 110px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.watch svg { width: 96px; height: 34px; overflow: visible; }
+.watch path { fill: none; stroke: #4ade80; stroke-width: 3; filter: drop-shadow(0 0 5px rgba(74,222,128,.45)); }
+.up { color: #4ade80; }
+.down { color: #fb7185; }
+.market-card { margin-top: auto; border-radius: 18px; border: 1px solid rgba(109,93,252,.3); padding: 14px; background: rgba(109,93,252,.08); }
+.market-card span, .market-card strong { display: block; }
+
+.center { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.topbar { padding: 18px 22px; display: flex; justify-content: space-between; align-items: center; }
+h1, h2, p { margin: 0; }
+h1 { font-size: clamp(30px, 4vw, 54px); line-height: 1; letter-spacing: -.05em; }
+.hero-card { padding: 22px; }
+.stock-head { display: flex; justify-content: space-between; gap: 18px; align-items: start; }
+h2 { font-size: 36px; letter-spacing: -.04em; }
+h2 small { font-size: 17px; font-weight: 600; color: #91a6c4; }
+.price { text-align: right; }
+.price strong { display: block; font-size: 38px; letter-spacing: -.04em; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0 6px; }
+.stats span { border: 1px solid rgba(90,119,156,.22); background: rgba(255,255,255,.025); border-radius: 16px; padding: 12px; color: #91a6c4; }
+.stats b { display:block; color: #eef6ff; margin-top: 4px; }
+.chart { width: 100%; height: 340px; margin-top: 8px; }
+.grid { stroke: rgba(120,144,173,.13); stroke-width: 1; }
+.line { fill: none; stroke: #4ade80; stroke-width: 5; stroke-linecap: round; filter: drop-shadow(0 0 14px rgba(74,222,128,.45)); }
+.volume { fill: rgba(109,93,252,.28); }
+
+.heat { padding: 18px; }
+.heatgrid { display: flex; flex-wrap: wrap; gap: 10px; min-height: 220px; margin-top: 14px; }
+.heatgrid button { min-width: 120px; min-height: 86px; flex-basis: 18%; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; color: #f8fbff; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.heatgrid strong { font-size: 22px; }
+.heatgrid .gain { background: linear-gradient(135deg, rgba(34,197,94,.78), rgba(20,83,45,.72)); }
+.heatgrid .loss { background: linear-gradient(135deg, rgba(239,68,68,.78), rgba(127,29,29,.72)); }
+
+.bottom-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.metric { padding: 18px; }
+.metric span { color: #8aa0bd; }
+.metric strong { display:block; font-size: 30px; margin: 8px 0; letter-spacing: -.04em; }
+
+.rightcol { display: flex; flex-direction: column; gap: 18px; }
+.rightcol .panel { padding: 18px; }
+.news { margin-top: 14px; padding: 14px; border-radius: 18px; background: rgba(255,255,255,.025); border: 1px solid rgba(90,119,156,.18); }
+.news span, .news strong, .news small { display:block; }
+.news strong { margin: 6px 0; }
+.confidence { height: 10px; margin-top: 18px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+.confidence span { display:block; height:100%; background: linear-gradient(90deg, #6d5dfc, #4ade80); }
+.split { display:grid; gap: 18px; }
+.split p { color: #adc0d8; margin-top: 9px; font-size: 14px; }
+.pill { margin: 10px 8px 0 0; border: 1px solid rgba(74,222,128,.35); background: rgba(74,222,128,.08); color: #c8f7d8; border-radius: 999px; padding: 9px 12px; }
+
+@media (max-width: 1180px) { .shell { grid-template-columns: 1fr; } .sidebar { position: static; height: auto; } .rightcol { grid-template-columns: repeat(2, 1fr); display:grid; } }
+@media (max-width: 760px) { .shell { padding: 10px; gap: 10px; } .stock-head, .topbar { flex-direction: column; } .price { text-align: left; } .stats, .bottom-grid, .rightcol { grid-template-columns: 1fr; } .watch { grid-template-columns: 1fr 70px 54px; } .watch svg { width: 70px; } }

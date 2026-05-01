@@ -1,0 +1,215 @@
+import { useEffect, useMemo, useState } from 'react'
+import './App.css'
+
+type Stock = {
+  symbol: string
+  name: string
+  sector: string
+  price: number
+  change: number
+  marketCap: string
+  confidence: number
+  thesis: string
+  risks: string[]
+  opportunities: string[]
+  catalysts: string[]
+  chart: number[]
+}
+
+type PortfolioSeed = {
+  cash: number
+  positions: { symbol: string; shares: number; avgCost: number }[]
+}
+
+const fallbackStocks: Stock[] = [
+  {
+    symbol: 'NVDA', name: 'NVIDIA', sector: 'AI Compute', price: 1132.4, change: 3.84, marketCap: '$2.8T', confidence: 94,
+    thesis: 'NVIDIA remains the cleanest large-cap AI infrastructure story: demand for accelerators, networking, and software is still running ahead of supply.',
+    risks: ['Customer concentration among hyperscalers', 'Export restrictions could pressure China revenue', 'Any Blackwell delay would hit sentiment fast'],
+    opportunities: ['Blackwell ramp refreshes the upgrade cycle', 'Networking attach rates can lift system-level revenue', 'Enterprise AI software is still early'],
+    catalysts: ['Blackwell shipment updates', 'Hyperscaler capex commentary', 'Data-center margin trend'],
+    chart: [72, 74, 73, 78, 81, 80, 86, 91, 89, 94, 98, 102, 101, 108, 116]
+  },
+  {
+    symbol: 'AVGO', name: 'Broadcom', sector: 'AI Networking', price: 1418.77, change: 2.11, marketCap: '$660B', confidence: 88,
+    thesis: 'Broadcom is becoming a toll road for AI data centers through custom silicon, switching, and VMware cash flow.',
+    risks: ['VMware integration execution', 'Custom AI chip demand can be lumpy', 'Debt load after acquisition'],
+    opportunities: ['AI networking buildouts', 'VMware margin expansion', 'Custom ASIC wins'],
+    catalysts: ['AI revenue guide', 'VMware renewal metrics', 'Large cloud customer wins'],
+    chart: [61, 64, 66, 65, 69, 74, 73, 78, 82, 84, 83, 88, 91, 93, 96]
+  },
+  {
+    symbol: 'MSFT', name: 'Microsoft', sector: 'Cloud / AI Apps', price: 432.68, change: 1.04, marketCap: '$3.2T', confidence: 86,
+    thesis: 'Microsoft has the best distribution for turning AI into paid software, with Azure and Copilot doing the heavy lifting.',
+    risks: ['AI capex could outpace near-term revenue', 'Copilot adoption may take longer than bulls expect', 'Regulatory pressure'],
+    opportunities: ['Copilot monetization', 'Azure share gains', 'OpenAI ecosystem pull-through'],
+    catalysts: ['Azure growth rate', 'Copilot seat disclosures', 'AI margin commentary'],
+    chart: [83, 82, 84, 86, 88, 87, 90, 91, 93, 92, 95, 98, 97, 101, 103]
+  },
+  {
+    symbol: 'TSM', name: 'Taiwan Semi', sector: 'Foundry', price: 168.92, change: -0.42, marketCap: '$875B', confidence: 82,
+    thesis: 'TSMC is the manufacturing backbone of advanced AI chips, but geopolitics keeps a permanent risk discount on the stock.',
+    risks: ['Taiwan geopolitical risk', 'Capex intensity', 'Customer bargaining power'],
+    opportunities: ['Advanced packaging demand', '2nm cycle', 'Pricing power at leading nodes'],
+    catalysts: ['Monthly sales', 'AI capacity expansion', '2nm yield updates'],
+    chart: [58, 61, 64, 66, 68, 67, 69, 72, 75, 76, 74, 77, 80, 79, 81]
+  },
+  {
+    symbol: 'PLTR', name: 'Palantir', sector: 'AI Software', price: 43.7, change: -2.26, marketCap: '$98B', confidence: 74,
+    thesis: 'Palantir has real enterprise AI momentum, but the stock already prices in a lot of future perfection.',
+    risks: ['High expectations', 'Government contract timing', 'Valuation sensitivity'],
+    opportunities: ['AIP bootcamp conversion', 'Commercial customer expansion', 'Defense AI demand'],
+    catalysts: ['Commercial revenue growth', 'Customer count', 'Margin durability'],
+    chart: [35, 36, 39, 41, 40, 43, 47, 46, 50, 54, 52, 55, 57, 53, 51]
+  },
+  {
+    symbol: 'AMZN', name: 'Amazon', sector: 'Cloud / Consumer', price: 187.21, change: 0.74, marketCap: '$1.95T', confidence: 80,
+    thesis: 'Amazon is a two-engine story: AWS AI demand plus retail margin improvement.',
+    risks: ['AWS competition', 'Consumer slowdown', 'Regulatory pressure'],
+    opportunities: ['AWS AI services', 'Ads growth', 'Fulfillment efficiency'],
+    catalysts: ['AWS growth', 'Retail operating margin', 'Advertising revenue'],
+    chart: [67, 66, 68, 70, 69, 73, 75, 74, 77, 80, 79, 82, 84, 83, 86]
+  }
+]
+
+const fallbackPortfolio: PortfolioSeed = {
+  cash: 18420,
+  positions: [
+    { symbol: 'NVDA', shares: 18, avgCost: 742 },
+    { symbol: 'MSFT', shares: 24, avgCost: 318 },
+    { symbol: 'AVGO', shares: 8, avgCost: 936 },
+    { symbol: 'TSM', shares: 40, avgCost: 112 },
+  ],
+}
+
+const news = [
+  { tag: 'AI Capex', title: 'Hyperscalers keep spending aggressively on AI data centers', impact: 'Bullish for NVDA, AVGO, VRT', time: '22m ago' },
+  { tag: 'Chips', title: 'Advanced packaging capacity remains the bottleneck investors are watching', impact: 'Watch TSM and NVDA supply commentary', time: '1h ago' },
+  { tag: 'Software', title: 'Enterprise AI budgets are shifting from pilots to production workloads', impact: 'MSFT and PLTR benefit if conversion holds', time: '3h ago' },
+]
+
+const heatmap = [
+  { symbol: 'NVDA', change: 3.84, size: 20 }, { symbol: 'AVGO', change: 2.11, size: 15 }, { symbol: 'MSFT', change: 1.04, size: 13 },
+  { symbol: 'AMZN', change: 0.74, size: 12 }, { symbol: 'GOOG', change: -0.38, size: 11 }, { symbol: 'META', change: 1.62, size: 10 },
+  { symbol: 'TSM', change: -0.42, size: 10 }, { symbol: 'ARM', change: 4.27, size: 8 }, { symbol: 'INTC', change: -3.08, size: 8 },
+  { symbol: 'QCOM', change: 0.31, size: 7 }, { symbol: 'PLTR', change: -2.26, size: 7 }, { symbol: 'VRT', change: 2.94, size: 7 },
+]
+
+function sparkPath(values: number[], width = 96, height = 34) {
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  return values.map((value, index) => {
+    const x = (index / (values.length - 1)) * width
+    const y = height - ((value - min) / Math.max(max - min, 1)) * height
+    return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`
+  }).join(' ')
+}
+
+function App() {
+  const [stocks, setStocks] = useState<Stock[]>(fallbackStocks)
+  const [portfolio, setPortfolio] = useState<PortfolioSeed>(fallbackPortfolio)
+  const [selectedSymbol, setSelectedSymbol] = useState('NVDA')
+  const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`${import.meta.env.BASE_URL}data/stocks.json`).then((r) => r.json()).catch(() => fallbackStocks),
+      fetch(`${import.meta.env.BASE_URL}data/portfolio.json`).then((r) => r.json()).catch(() => fallbackPortfolio),
+    ]).then(([stockData, portfolioData]) => {
+      const saved = JSON.parse(localStorage.getItem('commandCenterWatchlist') || '[]') as Stock[]
+      const merged = [...stockData, ...saved].filter((stock, index, all) => all.findIndex((s) => s.symbol === stock.symbol) === index)
+      setStocks(merged)
+      setPortfolio(portfolioData)
+    })
+  }, [])
+
+  const selected = stocks.find((stock) => stock.symbol === selectedSymbol) || stocks[0]
+  const positions = portfolio.positions.map((position) => ({ ...position, stock: stocks.find((stock) => stock.symbol === position.symbol) })).filter((p) => p.stock)
+  const equity = positions.reduce((sum, position) => sum + (position.stock?.price || 0) * position.shares, 0)
+  const cost = positions.reduce((sum, position) => sum + position.avgCost * position.shares, 0)
+  const pnl = equity - cost
+
+  const filtered = useMemo(() => stocks.filter((stock) => `${stock.symbol} ${stock.name}`.toLowerCase().includes(query.toLowerCase())), [query, stocks])
+
+  function addTicker() {
+    const raw = query.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5)
+    if (!raw) return
+    const existing = stocks.find((stock) => stock.symbol === raw)
+    if (existing) {
+      setSelectedSymbol(existing.symbol)
+      setQuery('')
+      return
+    }
+    const generated: Stock = {
+      symbol: raw,
+      name: `${raw} Research Candidate`,
+      sector: 'Watchlist',
+      price: Number((40 + Math.random() * 240).toFixed(2)),
+      change: Number((Math.random() * 8 - 4).toFixed(2)),
+      marketCap: 'Research',
+      confidence: 62,
+      thesis: 'Newly added research candidate. Connect a market data API later; for now the app saves it locally and treats it as a portfolio watch item.',
+      risks: ['Needs real financial data', 'Unknown valuation setup', 'No catalyst history yet'],
+      opportunities: ['Fresh research target', 'Can be promoted into portfolio tracking', 'Add notes and API enrichment later'],
+      catalysts: ['User-added ticker', 'Awaiting data provider connection', 'Research queue item'],
+      chart: Array.from({ length: 15 }, (_, i) => 60 + i * 1.5 + Math.sin(i) * 8),
+    }
+    const next = [...stocks, generated]
+    setStocks(next)
+    setSelectedSymbol(raw)
+    localStorage.setItem('commandCenterWatchlist', JSON.stringify(next.filter((stock) => !fallbackStocks.some((seed) => seed.symbol === stock.symbol))))
+    setQuery('')
+  }
+
+  return (
+    <main className="shell">
+      <aside className="sidebar panel">
+        <div className="brand"><span className="logo">▲</span><div><strong>Stock Command</strong><small>Market intelligence desk</small></div></div>
+        <label className="search"><span>Search / add ticker</span><div><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTicker()} placeholder="NVDA, Microsoft, ARM..."/><button onClick={addTicker}>Add</button></div></label>
+        <div className="watchlist">
+          <div className="section-title">Watchlist</div>
+          {(query ? filtered : stocks).map((stock) => (
+            <button key={stock.symbol} className={`watch ${stock.symbol === selected.symbol ? 'active' : ''}`} onClick={() => setSelectedSymbol(stock.symbol)}>
+              <span><strong>{stock.symbol}</strong><small>{stock.name}</small></span>
+              <svg viewBox="0 0 96 34"><path d={sparkPath(stock.chart)} /></svg>
+              <b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change}%</b>
+            </button>
+          ))}
+        </div>
+        <div className="market-card"><span>Market Status</span><strong>Risk-on, AI-led tape</strong><small>Semis leading; software selective; rates stable.</small></div>
+      </aside>
+
+      <section className="center">
+        <header className="topbar panel"><div><span className="eyebrow">Live prototype · GitHub JSON database</span><h1>Market Command Center</h1></div><button className="primary">Save thesis</button></header>
+        <section className="hero-card panel">
+          <div className="stock-head"><div><span className="eyebrow">Selected equity</span><h2>{selected.symbol} <small>{selected.name}</small></h2></div><div className="price"><strong>${selected.price.toLocaleString()}</strong><span className={selected.change >= 0 ? 'up' : 'down'}>{selected.change >= 0 ? '+' : ''}{selected.change}% today</span></div></div>
+          <div className="stats"><span>Sector <b>{selected.sector}</b></span><span>Market cap <b>{selected.marketCap}</b></span><span>Conviction <b>{selected.confidence}/100</b></span></div>
+          <svg className="chart" viewBox="0 0 900 300" preserveAspectRatio="none">
+            <defs><linearGradient id="glow" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#4ade80" stopOpacity=".35"/><stop offset="1" stopColor="#4ade80" stopOpacity="0"/></linearGradient></defs>
+            {[0,1,2,3,4].map((i) => <line key={i} x1="0" x2="900" y1={55 + i*48} y2={55 + i*48} className="grid"/>)}
+            <path d={`${sparkPath(selected.chart, 900, 230)} L900 300 L0 300 Z`} fill="url(#glow)" transform="translate(0 28)"/>
+            <path d={sparkPath(selected.chart, 900, 230)} className="line" transform="translate(0 28)"/>
+            {selected.chart.map((v, i) => <rect key={i} x={i*60+10} y={250 - (v % 42)} width="28" height={30 + (v % 42)} rx="4" className="volume"/>)}
+          </svg>
+        </section>
+
+        <section className="heat panel"><div className="section-title">Integrated market heatmap</div><div className="heatgrid">{heatmap.map((tile) => <button key={tile.symbol} onClick={() => stocks.some((s) => s.symbol === tile.symbol) && setSelectedSymbol(tile.symbol)} className={tile.change >= 0 ? 'gain' : 'loss'} style={{ flexGrow: tile.size }}><strong>{tile.symbol}</strong><span>{tile.change >= 0 ? '+' : ''}{tile.change}%</span></button>)}</div></section>
+
+        <section className="bottom-grid">
+          <div className="panel metric"><span>Portfolio value</span><strong>${(equity + portfolio.cash).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong><small>Cash ${portfolio.cash.toLocaleString()}</small></div>
+          <div className="panel metric"><span>Open gain/loss</span><strong className={pnl >= 0 ? 'up' : 'down'}>{pnl >= 0 ? '+' : ''}${pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong><small>{((pnl / cost) * 100).toFixed(1)}% on tracked positions</small></div>
+          <div className="panel metric"><span>Top exposure</span><strong>{positions.sort((a,b) => ((b.stock?.price || 0)*b.shares) - ((a.stock?.price || 0)*a.shares))[0]?.symbol}</strong><small>Based on seed portfolio JSON</small></div>
+        </section>
+      </section>
+
+      <aside className="rightcol">
+        <section className="panel"><div className="section-title">Latest catalysts</div>{news.map((item) => <article className="news" key={item.title}><span>{item.tag} · {item.time}</span><strong>{item.title}</strong><small>{item.impact}</small></article>)}</section>
+        <section className="panel"><div className="section-title">AI research summary</div><p>{selected.thesis}</p><div className="confidence"><span style={{ width: `${selected.confidence}%` }} /></div></section>
+        <section className="panel split"><div><div className="section-title">Opportunities</div>{selected.opportunities.map((item) => <p key={item}>+ {item}</p>)}</div><div><div className="section-title">Risks</div>{selected.risks.map((item) => <p key={item}>− {item}</p>)}</div></section>
+        <section className="panel"><div className="section-title">Catalyst tracker</div>{selected.catalysts.map((item) => <button className="pill" key={item}>{item}</button>)}</section>
+      </aside>
+    </main>
+  )
+}
+
+export default App
