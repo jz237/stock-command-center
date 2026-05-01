@@ -19,6 +19,9 @@ concurrency:
 
 jobs:
   update-prices:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -39,3 +42,12 @@ jobs:
         with:
           commit_message: 'chore: refresh stock prices'
           file_pattern: 'data/stocks.json public/data/stocks.json'
+      - name: Build updated site
+        run: npm run build
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+      - name: Deploy updated prices to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
