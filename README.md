@@ -4,7 +4,7 @@ A static GitHub Pages prototype for a premium stock investing dashboard.
 
 ## Features
 
-- Dark market-command-center UI with watchlist, central chart, heatmap, catalysts, AI research, risks, opportunities, and portfolio widgets.
+- Dark market-command-center UI with watchlist, real interactive Lightweight Charts chart, heatmap, catalysts, AI research, risks, opportunities, and portfolio widgets.
 - GitHub-backed JSON data in `data/stocks.json` and `data/portfolio.json`.
 - Seed stock prices refresh from the free `stockprices.dev` quote API via GitHub Actions, then deploy as static JSON for the site to read.
 - User-added tickers persist in `localStorage` so the static site needs no backend secrets.
@@ -21,4 +21,4 @@ npm run update-prices
 
 ## Notes
 
-This is a polished prototype. Stock prices for seeded tickers are refreshed through GitHub Actions using `stockprices.dev` with no frontend API keys. News, research text, and user-added tickers are still prototype/local data until a backend or GitHub-authorized write flow is added.
+This is a polished prototype. Stock prices for seeded tickers are refreshed through GitHub Actions using `stockprices.dev` with no frontend API keys. Charts now render with TradingView Lightweight Charts using the committed GitHub JSON chart series; the next upgrade is replacing the derived historical series with a true no-key historical feed or a serverless market-data cache. News, research text, and user-added tickers are still prototype/local data until a backend or GitHub-authorized write flow is added.

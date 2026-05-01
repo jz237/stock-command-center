@@ -123,3 +123,5 @@ h2 small { font-size: 17px; font-weight: 600; color: #91a6c4; }
 .catalyst-row span { color: #adc0d8; }
 @media (max-width: 1180px) { .detail-grid, .settings-grid, .research-grid, .news-page { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .holding-row, .catalyst-row { grid-template-columns: 1fr; } .timeframes { flex-wrap: wrap; } }
+.real-chart { width: 100%; height: 340px; margin-top: 14px; border-radius: 18px; overflow: hidden; background: linear-gradient(180deg, rgba(5,12,22,.58), rgba(5,12,22,.08)); }
+.expanded-chart .real-chart { height: 440px; }
