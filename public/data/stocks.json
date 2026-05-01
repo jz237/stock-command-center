@@ -48,11 +48,12 @@
       198.45,
       198.45,
       198.45,
+      198.45,
       198.45
     ],
     "changeAmount": -1.12,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-01T22:12:24.174Z"
+    "quoteUpdatedAt": "2026-05-01T22:58:05.772Z"
   },
   {
     "symbol": "AVGO",
@@ -103,11 +104,12 @@
       421.28,
       421.28,
       421.28,
+      421.28,
       421.28
     ],
     "changeAmount": 3.85,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-01T22:12:24.174Z"
+    "quoteUpdatedAt": "2026-05-01T22:58:05.772Z"
   },
   {
     "symbol": "MSFT",
@@ -159,11 +161,12 @@
       414.44,
       414.44,
       414.44,
+      414.44,
       414.44
     ],
     "changeAmount": 6.66,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-01T22:12:24.174Z"
+    "quoteUpdatedAt": "2026-05-01T22:58:05.772Z"
   },
   {
     "symbol": "AMZN",
@@ -212,11 +215,12 @@
       268.26,
       268.26,
       268.26,
+      268.26,
       268.26
     ],
     "changeAmount": 3.2,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-01T22:12:24.174Z"
+    "quoteUpdatedAt": "2026-05-01T22:58:05.772Z"
   },
   {
     "symbol": "TSM",
@@ -264,11 +268,12 @@
       397.67,
       397.67,
       397.67,
+      397.67,
       397.67
     ],
     "changeAmount": 1.61,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-01T22:12:24.174Z"
+    "quoteUpdatedAt": "2026-05-01T22:58:05.772Z"
   },
   {
     "symbol": "PLTR",
@@ -316,10 +321,11 @@
       144.07,
       144.07,
       144.07,
+      144.07,
       144.07
     ],
     "changeAmount": 4.96,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-01T22:12:24.174Z"
+    "quoteUpdatedAt": "2026-05-01T22:58:05.772Z"
   }
 ]
