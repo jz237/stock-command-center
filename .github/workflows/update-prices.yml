@@ -1,0 +1,41 @@
+name: Refresh stock prices
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Every 30 minutes during the core US market window, Monday-Friday.
+    - cron: '*/30 14-21 * * 1-5'
+    # One final pass after the close.
+    - cron: '5 22 * * 1-5'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: refresh-stock-prices
+  cancel-in-progress: true
+
+jobs:
+  update-prices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Refresh GitHub JSON price database
+        run: npm run update-prices
+      - name: Commit refreshed prices
+        uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: 'chore: refresh stock prices'
+          file_pattern: 'data/stocks.json public/data/stocks.json'

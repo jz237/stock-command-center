@@ -14,6 +14,9 @@ type Stock = {
   opportunities: string[]
   catalysts: string[]
   chart: number[]
+  changeAmount?: number
+  quoteSource?: string
+  quoteUpdatedAt?: string
 }
 
 type PortfolioSeed = {
@@ -88,12 +91,9 @@ const news = [
   { tag: 'Software', title: 'Enterprise AI budgets are shifting from pilots to production workloads', impact: 'MSFT and PLTR benefit if conversion holds', time: '3h ago' },
 ]
 
-const heatmap = [
-  { symbol: 'NVDA', change: 3.84, size: 20 }, { symbol: 'AVGO', change: 2.11, size: 15 }, { symbol: 'MSFT', change: 1.04, size: 13 },
-  { symbol: 'AMZN', change: 0.74, size: 12 }, { symbol: 'GOOG', change: -0.38, size: 11 }, { symbol: 'META', change: 1.62, size: 10 },
-  { symbol: 'TSM', change: -0.42, size: 10 }, { symbol: 'ARM', change: 4.27, size: 8 }, { symbol: 'INTC', change: -3.08, size: 8 },
-  { symbol: 'QCOM', change: 0.31, size: 7 }, { symbol: 'PLTR', change: -2.26, size: 7 }, { symbol: 'VRT', change: 2.94, size: 7 },
-]
+const heatmapSizes: Record<string, number> = {
+  NVDA: 20, AVGO: 15, MSFT: 13, AMZN: 12, GOOG: 11, META: 10, TSM: 10, ARM: 8, INTC: 8, QCOM: 7, PLTR: 7, VRT: 7,
+}
 
 function sparkPath(values: number[], width = 96, height = 34) {
   const min = Math.min(...values)
@@ -130,6 +130,12 @@ function App() {
   const pnl = equity - cost
 
   const filtered = useMemo(() => stocks.filter((stock) => `${stock.symbol} ${stock.name}`.toLowerCase().includes(query.toLowerCase())), [query, stocks])
+  const liveQuotes = stocks.filter((stock) => stock.quoteUpdatedAt)
+  const latestQuoteTime = liveQuotes.map((stock) => new Date(stock.quoteUpdatedAt as string).getTime()).filter(Number.isFinite).sort((a, b) => b - a)[0]
+  const quoteStamp = latestQuoteTime ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(latestQuoteTime)) : 'Seed data only'
+  const quoteSource = selected.quoteSource || 'GitHub JSON seed'
+  const heatmap = stocks.slice(0, 12).map((stock) => ({ symbol: stock.symbol, change: stock.change, size: heatmapSizes[stock.symbol] || 6 }))
+
 
   function addTicker() {
     const raw = query.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5)
@@ -148,7 +154,7 @@ function App() {
       change: Number((Math.random() * 8 - 4).toFixed(2)),
       marketCap: 'Research',
       confidence: 62,
-      thesis: 'Newly added research candidate. Connect a market data API later; for now the app saves it locally and treats it as a portfolio watch item.',
+      thesis: 'Newly added research candidate. Live quote refresh runs for seeded GitHub database tickers; this local ticker is saved in your browser until it is promoted into the repo data file.',
       risks: ['Needs real financial data', 'Unknown valuation setup', 'No catalyst history yet'],
       opportunities: ['Fresh research target', 'Can be promoted into portfolio tracking', 'Add notes and API enrichment later'],
       catalysts: ['User-added ticker', 'Awaiting data provider connection', 'Research queue item'],
@@ -180,9 +186,9 @@ function App() {
       </aside>
 
       <section className="center">
-        <header className="topbar panel"><div><span className="eyebrow">Live prototype · GitHub JSON database</span><h1>Market Command Center</h1></div><button className="primary">Save thesis</button></header>
+        <header className="topbar panel"><div><span className="eyebrow">Live prototype · GitHub JSON database · prices via stockprices.dev</span><h1>Market Command Center</h1><small className="quote-status">Latest quote refresh: {quoteStamp}</small></div><button className="primary">Save thesis</button></header>
         <section className="hero-card panel">
-          <div className="stock-head"><div><span className="eyebrow">Selected equity</span><h2>{selected.symbol} <small>{selected.name}</small></h2></div><div className="price"><strong>${selected.price.toLocaleString()}</strong><span className={selected.change >= 0 ? 'up' : 'down'}>{selected.change >= 0 ? '+' : ''}{selected.change}% today</span></div></div>
+          <div className="stock-head"><div><span className="eyebrow">Selected equity</span><h2>{selected.symbol} <small>{selected.name}</small></h2></div><div className="price"><strong>${selected.price.toLocaleString()}</strong><span className={selected.change >= 0 ? 'up' : 'down'}>{selected.change >= 0 ? '+' : ''}{selected.change}% today</span><small>{selected.changeAmount !== undefined ? `${selected.changeAmount >= 0 ? '+' : ''}$${Math.abs(selected.changeAmount).toFixed(2)} · ` : ''}{quoteSource}</small></div></div>
           <div className="stats"><span>Sector <b>{selected.sector}</b></span><span>Market cap <b>{selected.marketCap}</b></span><span>Conviction <b>{selected.confidence}/100</b></span></div>
           <svg className="chart" viewBox="0 0 900 300" preserveAspectRatio="none">
             <defs><linearGradient id="glow" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#4ade80" stopOpacity=".35"/><stop offset="1" stopColor="#4ade80" stopOpacity="0"/></linearGradient></defs>

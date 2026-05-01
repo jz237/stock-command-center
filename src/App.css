@@ -93,3 +93,5 @@ h2 small { font-size: 17px; font-weight: 600; color: #91a6c4; }
 
 @media (max-width: 1180px) { .shell { grid-template-columns: 1fr; } .sidebar { position: static; height: auto; } .rightcol { grid-template-columns: repeat(2, 1fr); display:grid; } }
 @media (max-width: 760px) { .shell { padding: 10px; gap: 10px; } .stock-head, .topbar { flex-direction: column; } .price { text-align: left; } .stats, .bottom-grid, .rightcol { grid-template-columns: 1fr; } .watch { grid-template-columns: 1fr 70px 54px; } .watch svg { width: 70px; } }
+.quote-status { display: block; margin-top: 8px; color: #8aa0bd; }
+.price small { display: block; margin-top: 6px; color: #7890ad; }

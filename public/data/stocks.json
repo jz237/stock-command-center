@@ -3,84 +3,276 @@
     "symbol": "NVDA",
     "name": "NVIDIA",
     "sector": "AI Compute",
-    "price": 1132.4,
-    "change": 3.84,
+    "price": 199.57,
+    "change": -4.63,
     "marketCap": "$2.8T",
     "confidence": 94,
     "thesis": "NVIDIA remains the cleanest large-cap AI infrastructure story: demand for accelerators, networking, and software is still running ahead of supply.",
-    "risks": ["Customer concentration among hyperscalers", "Export restrictions could pressure China revenue", "Any Blackwell delay would hit sentiment fast"],
-    "opportunities": ["Blackwell ramp refreshes the upgrade cycle", "Networking attach rates can lift system-level revenue", "Enterprise AI software is still early"],
-    "catalysts": ["Blackwell shipment updates", "Hyperscaler capex commentary", "Data-center margin trend"],
-    "chart": [72, 74, 73, 78, 81, 80, 86, 91, 89, 94, 98, 102, 101, 108, 116]
+    "risks": [
+      "Customer concentration among hyperscalers",
+      "Export restrictions could pressure China revenue",
+      "Any Blackwell delay would hit sentiment fast"
+    ],
+    "opportunities": [
+      "Blackwell ramp refreshes the upgrade cycle",
+      "Networking attach rates can lift system-level revenue",
+      "Enterprise AI software is still early"
+    ],
+    "catalysts": [
+      "Blackwell shipment updates",
+      "Hyperscaler capex commentary",
+      "Data-center margin trend"
+    ],
+    "chart": [
+      187.6,
+      188.68,
+      188.14,
+      190.86,
+      192.49,
+      191.95,
+      195.22,
+      197.94,
+      196.85,
+      199.57,
+      201.75,
+      203.92,
+      203.38,
+      207.19,
+      211.54,
+      199.57
+    ],
+    "changeAmount": -9.68,
+    "quoteSource": "stockprices.dev",
+    "quoteUpdatedAt": "2026-05-01T00:24:55.666Z"
   },
   {
     "symbol": "AVGO",
     "name": "Broadcom",
     "sector": "AI Networking",
-    "price": 1418.77,
-    "change": 2.11,
+    "price": 417.43,
+    "change": 2.95,
     "marketCap": "$660B",
     "confidence": 88,
     "thesis": "Broadcom is becoming a toll road for AI data centers through custom silicon, switching, and VMware cash flow.",
-    "risks": ["VMware integration execution", "Custom AI chip demand can be lumpy", "Debt load after acquisition"],
-    "opportunities": ["AI networking buildouts", "VMware margin expansion", "Custom ASIC wins"],
-    "catalysts": ["AI revenue guide", "VMware renewal metrics", "Large cloud customer wins"],
-    "chart": [61, 64, 66, 65, 69, 74, 73, 78, 82, 84, 83, 88, 91, 93, 96]
+    "risks": [
+      "VMware integration execution",
+      "Custom AI chip demand can be lumpy",
+      "Debt load after acquisition"
+    ],
+    "opportunities": [
+      "AI networking buildouts",
+      "VMware margin expansion",
+      "Custom ASIC wins"
+    ],
+    "catalysts": [
+      "AI revenue guide",
+      "VMware renewal metrics",
+      "Large cloud customer wins"
+    ],
+    "chart": [
+      392.38,
+      396.68,
+      399.54,
+      398.11,
+      403.83,
+      410.99,
+      409.56,
+      416.71,
+      422.44,
+      425.3,
+      423.87,
+      431.03,
+      435.32,
+      438.18,
+      442.48,
+      417.43
+    ],
+    "changeAmount": 11.98,
+    "quoteSource": "stockprices.dev",
+    "quoteUpdatedAt": "2026-05-01T00:24:55.666Z"
   },
   {
     "symbol": "MSFT",
     "name": "Microsoft",
     "sector": "Cloud / AI Apps",
-    "price": 432.68,
-    "change": 1.04,
+    "price": 407.78,
+    "change": -3.93,
     "marketCap": "$3.2T",
     "confidence": 86,
     "thesis": "Microsoft has the best distribution for turning AI into paid software, with Azure and Copilot doing the heavy lifting.",
-    "risks": ["AI capex could outpace near-term revenue", "Copilot adoption may take longer than bulls expect", "Regulatory pressure"],
-    "opportunities": ["Copilot monetization", "Azure share gains", "OpenAI ecosystem pull-through"],
-    "catalysts": ["Azure growth rate", "Copilot seat disclosures", "AI margin commentary"],
-    "chart": [83, 82, 84, 86, 88, 87, 90, 91, 93, 92, 95, 98, 97, 101, 103]
+    "risks": [
+      "AI capex could outpace near-term revenue",
+      "Copilot adoption may take longer than bulls expect",
+      "Regulatory pressure"
+    ],
+    "opportunities": [
+      "Copilot monetization",
+      "Azure share gains",
+      "OpenAI ecosystem pull-through"
+    ],
+    "catalysts": [
+      "Azure growth rate",
+      "Copilot seat disclosures",
+      "AI margin commentary"
+    ],
+    "chart": [
+      385.64,
+      383.31,
+      387.97,
+      392.63,
+      397.29,
+      394.96,
+      401.95,
+      404.28,
+      408.95,
+      406.61,
+      413.61,
+      420.6,
+      418.27,
+      427.59,
+      432.25,
+      407.78
+    ],
+    "changeAmount": -16.68,
+    "quoteSource": "stockprices.dev",
+    "quoteUpdatedAt": "2026-05-01T00:24:55.666Z"
   },
   {
     "symbol": "AMZN",
     "name": "Amazon",
     "sector": "Cloud / Consumer",
-    "price": 187.21,
-    "change": 0.74,
+    "price": 265.06,
+    "change": 0.77,
     "marketCap": "$1.95T",
     "confidence": 80,
     "thesis": "Amazon is a two-engine story: AWS AI demand plus retail margin improvement.",
-    "risks": ["AWS competition", "Consumer slowdown", "Regulatory pressure"],
-    "opportunities": ["AWS AI services", "Ads growth", "Fulfillment efficiency"],
-    "catalysts": ["AWS growth", "Retail operating margin", "Advertising revenue"],
-    "chart": [67, 66, 68, 70, 69, 73, 75, 74, 77, 80, 79, 82, 84, 83, 86]
+    "risks": [
+      "AWS competition",
+      "Consumer slowdown",
+      "Regulatory pressure"
+    ],
+    "opportunities": [
+      "AWS AI services",
+      "Ads growth",
+      "Fulfillment efficiency"
+    ],
+    "catalysts": [
+      "AWS growth",
+      "Retail operating margin",
+      "Advertising revenue"
+    ],
+    "chart": [
+      250.75,
+      249.16,
+      252.34,
+      255.52,
+      253.93,
+      260.29,
+      263.47,
+      261.88,
+      266.65,
+      271.42,
+      269.83,
+      274.6,
+      277.78,
+      276.19,
+      280.96,
+      265.06
+    ],
+    "changeAmount": 2.02,
+    "quoteSource": "stockprices.dev",
+    "quoteUpdatedAt": "2026-05-01T00:24:55.666Z"
   },
   {
     "symbol": "TSM",
     "name": "Taiwan Semiconductor",
     "sector": "Foundry",
-    "price": 168.92,
-    "change": -0.42,
+    "price": 396.06,
+    "change": 0.57,
     "marketCap": "$875B",
     "confidence": 82,
     "thesis": "TSMC is the manufacturing backbone of advanced AI chips, but geopolitics keeps a permanent risk discount on the stock.",
-    "risks": ["Taiwan geopolitical risk", "Capex intensity", "Customer bargaining power"],
-    "opportunities": ["Advanced packaging demand", "2nm cycle", "Pricing power at leading nodes"],
-    "catalysts": ["Monthly sales", "AI capacity expansion", "2nm yield updates"],
-    "chart": [58, 61, 64, 66, 68, 67, 69, 72, 75, 76, 74, 77, 80, 79, 81]
+    "risks": [
+      "Taiwan geopolitical risk",
+      "Capex intensity",
+      "Customer bargaining power"
+    ],
+    "opportunities": [
+      "Advanced packaging demand",
+      "2nm cycle",
+      "Pricing power at leading nodes"
+    ],
+    "catalysts": [
+      "Monthly sales",
+      "AI capacity expansion",
+      "2nm yield updates"
+    ],
+    "chart": [
+      372.3,
+      378.5,
+      384.69,
+      388.83,
+      392.96,
+      390.89,
+      395.03,
+      401.23,
+      407.43,
+      409.49,
+      405.36,
+      411.56,
+      417.76,
+      415.69,
+      419.82,
+      396.06
+    ],
+    "changeAmount": 2.23,
+    "quoteSource": "stockprices.dev",
+    "quoteUpdatedAt": "2026-05-01T00:24:55.666Z"
   },
   {
     "symbol": "PLTR",
     "name": "Palantir",
     "sector": "AI Software",
-    "price": 43.7,
-    "change": -2.26,
+    "price": 139.11,
+    "change": 0.83,
     "marketCap": "$98B",
     "confidence": 74,
     "thesis": "Palantir has real enterprise AI momentum, but the stock already prices in a lot of future perfection.",
-    "risks": ["High expectations", "Government contract timing", "Valuation sensitivity"],
-    "opportunities": ["AIP bootcamp conversion", "Commercial customer expansion", "Defense AI demand"],
-    "catalysts": ["Commercial revenue growth", "Customer count", "Margin durability"],
-    "chart": [35, 36, 39, 41, 40, 43, 47, 46, 50, 54, 52, 55, 57, 53, 51]
+    "risks": [
+      "High expectations",
+      "Government contract timing",
+      "Valuation sensitivity"
+    ],
+    "opportunities": [
+      "AIP bootcamp conversion",
+      "Commercial customer expansion",
+      "Defense AI demand"
+    ],
+    "catalysts": [
+      "Commercial revenue growth",
+      "Customer count",
+      "Margin durability"
+    ],
+    "chart": [
+      130.76,
+      131.52,
+      133.8,
+      135.32,
+      134.56,
+      136.83,
+      139.87,
+      139.11,
+      142.15,
+      145.18,
+      143.66,
+      145.94,
+      147.46,
+      144.42,
+      142.9,
+      139.11
+    ],
+    "changeAmount": 1.14,
+    "quoteSource": "stockprices.dev",
+    "quoteUpdatedAt": "2026-05-01T00:24:55.666Z"
   }
 ]
