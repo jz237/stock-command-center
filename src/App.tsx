@@ -560,7 +560,9 @@ function App() {
   function openPanel(panel: Exclude<DetailPanel, null>) {
     setDetailPanel(panel)
     window.history.replaceState(null, '', `#${panel}`)
-    window.setTimeout(() => document.querySelector('.detail-drawer')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+    if (panel !== 'research' && panel !== 'catalysts') {
+      window.setTimeout(() => document.querySelector('.detail-drawer')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+    }
   }
 
   function openCatalystArticle(text: string) {
@@ -681,11 +683,9 @@ function App() {
             </>}
           </aside>
         </div>
-        {detailPanel && <section className="detail-drawer panel">
-          <div className="drawer-head"><div><span className="eyebrow">Command detail</span><h2>{detailPanel === 'report' ? `${selected.symbol} Full Research Report` : detailPanel === 'research' ? `${selected.symbol} Investment Readout` : detailPanel === 'catalysts' ? `${selected.symbol} Catalyst Radar` : detailPanel === 'risks' ? 'Risks & Opportunities' : 'Tracked StockBot Watchlist'}</h2></div><button onClick={closePanel}>Close ×</button></div>
+        {detailPanel && detailPanel !== 'research' && detailPanel !== 'catalysts' && <section className="detail-drawer panel">
+          <div className="drawer-head"><div><span className="eyebrow">Command detail</span><h2>{detailPanel === 'report' ? `${selected.symbol} Full Research Report` : detailPanel === 'risks' ? 'Risks & Opportunities' : 'Tracked StockBot Watchlist'}</h2></div><button onClick={closePanel}>Close ×</button></div>
           {detailPanel === 'report' && <div className="drawer-grid report-view"><article><h3>Thesis</h3><p>{selected.thesis}</p><dl><dt>Conviction</dt><dd>{selected.confidence}/100</dd><dt>Sector</dt><dd>{selected.sector}</dd><dt>Market cap</dt><dd>{selected.marketCap}</dd><dt>Rating</dt><dd>{selected.rating || 'Watch'}</dd><dt>Target</dt><dd>{selected.targetPrice ? `$${money(selected.targetPrice)}` : '—'}</dd></dl></article><article><h3>Catalysts</h3>{selected.catalysts.map((item) => <p key={item}>● {item}</p>)}<h3>Key drivers</h3>{selected.opportunities.map((item) => <p className="good" key={item}>+ {item}</p>)}</article><article><h3>Risk checklist</h3>{selected.risks.map((item) => <p className="bad" key={item}>− {item}</p>)}<button onClick={() => setView('Portfolio')} className="drawer-action">Track in public watchlist</button></article></div>}
-          {detailPanel === 'research' && <div className="drawer-grid report-view"><article><h3>Readout</h3>{investmentReadout.map((item) => <p key={item.label} className={item.tone === 'down' ? 'bad' : item.tone === 'up' ? 'good' : ''}><b>{item.label}:</b> {item.text}</p>)}</article><article><h3>Confirming evidence</h3>{selected.opportunities.map((item) => <p className="good" key={item}>+ {item}</p>)}</article><article><h3>Break points</h3>{selected.risks.map((item) => <p className="bad" key={item}>− {item}</p>)}</article></div>}
-          {detailPanel === 'catalysts' && <div className="drawer-grid report-view"><article><h3>What could move {selected.symbol}</h3>{catalystRadar.map((item) => <p key={item.label} className={item.tone === 'down' ? 'bad' : 'good'}><b>{item.label}:</b> {item.text}</p>)}</article><article><h3>Bull triggers</h3>{selected.opportunities.map((item) => <p className="good" key={item}>+ {item}</p>)}</article><article><h3>Risk triggers</h3>{selected.risks.map((item) => <p className="bad" key={item}>− {item}</p>)}</article></div>}
           {detailPanel === 'risks' && <div className="drawer-grid"><article><h3>Risks</h3>{selected.risks.map((item) => <p className="bad" key={item}>● {item}</p>)}</article><article><h3>Opportunities</h3>{selected.opportunities.map((item) => <p className="good" key={item}>● {item}</p>)}</article><article><h3>Decision frame</h3><p>Use this panel as the quick checklist for whether news changes the story. If a catalyst validates an opportunity, the stock deserves attention. If a risk moves from theoretical to active, it belongs on the watch list.</p></article></div>}
           {detailPanel === 'watchlist' && <div className="drawer-table watchlist-table">{filtered.map((stock) => <button key={stock.symbol} onClick={() => { setSelectedSymbol(stock.symbol); setDetailPanel('report') }}><strong>{stock.symbol}</strong><span>{stock.name}</span><span>${money(stock.price)}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><small>{stock.sector}</small></button>)}</div>}
         </section>}
