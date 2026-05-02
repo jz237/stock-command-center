@@ -66,11 +66,18 @@ const LIVE_REFRESH_MS = 120_000
 function sparkPath(values: number[], width = 96, height = 34) {
   const min = Math.min(...values)
   const max = Math.max(...values)
-  return values.map((value, index) => {
+  const points = values.map((value, index) => {
     const x = (index / Math.max(values.length - 1, 1)) * width
     const y = height - ((value - min) / Math.max(max - min, 1)) * height
-    return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`
-  }).join(' ')
+    return { x, y }
+  })
+  if (points.length < 2) return ''
+  return points.reduce((path, point, index, all) => {
+    if (index === 0) return `M${point.x.toFixed(2)} ${point.y.toFixed(2)}`
+    const previous = all[index - 1]
+    const midX = (previous.x + point.x) / 2
+    return `${path} Q${previous.x.toFixed(2)} ${previous.y.toFixed(2)} ${midX.toFixed(2)} ${((previous.y + point.y) / 2).toFixed(2)} T${point.x.toFixed(2)} ${point.y.toFixed(2)}`
+  }, '')
 }
 
 function money(value: number, digits = 2) {
