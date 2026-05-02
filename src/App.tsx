@@ -178,7 +178,7 @@ function App() {
   }, {})
   const movers = [...stocks].sort((a, b) => b.change - a.change).slice(0, 5)
   const latestCatalysts = stocks.flatMap((stock) => stock.catalysts.slice(0, 1).map((title) => ({ stock, title }))).slice(0, 3)
-  const visibleWatchlist = query ? filtered : stocks.slice(0, 16)
+  const visibleWatchlist = query ? filtered : stocks
   const hiddenWatchlistCount = query ? 0 : Math.max(0, stocks.length - visibleWatchlist.length)
   const inPortfolio = saved.includes(selected.symbol)
   const marketStrip = [
