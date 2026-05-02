@@ -10,7 +10,7 @@ const ranges = ['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', '5Y', 'MAX']
 const rangeConfig = {
   '1D': { points: 78, days: 1, drift: 0.004, volatility: 0.22 },
   '5D': { points: 55, days: 5, drift: 0.012, volatility: 0.45 },
-  '1M': { points: 64, days: 30, drift: 0.028, volatility: 0.7 },
+  '1M': { points: 31, days: 30, drift: 0.028, volatility: 0.7 },
   '3M': { points: 78, days: 90, drift: 0.055, volatility: 0.85 },
   '6M': { points: 96, days: 180, drift: 0.09, volatility: 1.0 },
   YTD: { points: 110, days: 130, drift: 0.12, volatility: 1.1 },
