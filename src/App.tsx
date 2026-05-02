@@ -199,7 +199,7 @@ function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMod
       layout: { background: { color: 'transparent' }, textColor: '#8aa0bd', fontSize: 11 },
       grid: { vertLines: { color: 'rgba(120,144,173,.08)' }, horzLines: { color: 'rgba(120,144,173,.12)' } },
       rightPriceScale: { borderColor: 'rgba(120,144,173,.22)', scaleMargins: { top: 0.08, bottom: 0.24 } },
-      timeScale: { borderColor: 'rgba(120,144,173,.18)', timeVisible: range === '1D', secondsVisible: false },
+      timeScale: { borderColor: 'rgba(120,144,173,.18)', timeVisible: range === '1D' || range === '5D', secondsVisible: false },
       crosshair: { mode: 1, vertLine: { color: 'rgba(226,239,251,.25)' }, horzLine: { color: 'rgba(226,239,251,.18)' } },
     })
     const area = chart.addSeries(AreaSeries, { lineColor: '#29d681', topColor: 'rgba(41,214,129,.30)', bottomColor: 'rgba(41,214,129,0)', lineWidth: 2, priceLineColor: 'rgba(41,214,129,.55)' })
@@ -312,6 +312,11 @@ function App() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [detailPanel, setDetailPanel] = useState<DetailPanel>(null)
   const liveSymbolsKey = useMemo(() => stocks.map((stock) => stock.symbol).join('|'), [stocks])
+  const stocksRef = useRef(stocks)
+
+  useEffect(() => {
+    stocksRef.current = stocks
+  }, [stocks])
 
   useEffect(() => {
     Promise.all([
@@ -341,7 +346,7 @@ function App() {
   useEffect(() => {
     let cancelled = false
     async function refreshLivePrices() {
-      const liveStocks = stocks.filter((stock) => liveSymbolsKey.split('|').includes(stock.symbol))
+      const liveStocks = stocksRef.current.filter((stock) => liveSymbolsKey.split('|').includes(stock.symbol))
       const symbols = liveStocks.map((stock) => stock.symbol)
       if (!symbols.length) return
       const updates = await Promise.allSettled(liveStocks.map((stock) => fetchYahooQuote(stock.symbol, stock.price)))

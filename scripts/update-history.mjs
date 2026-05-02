@@ -39,6 +39,8 @@ function valueFromSource(prices, index, points, latest, config, symbol) {
 }
 
 function buildRangeRows(symbol, sourceRows, range) {
+  if (range === '5D') return buildFiveDayRows(symbol, sourceRows)
+
   const config = rangeConfig[range]
   const prices = sourceRows.map((row) => Number(row.price)).filter(Number.isFinite)
   const latest = prices.at(-1)
@@ -67,6 +69,43 @@ function buildRangeRows(symbol, sourceRows, range) {
       close: Number(close.toFixed(2)),
       value: Number(close.toFixed(2)),
       volume: Math.round(600_000 + Math.abs(close - open) * 140_000 + (index % 9) * 85_000),
+    }
+  })
+}
+
+function buildFiveDayRows(symbol, sourceRows) {
+  const days = sourceRows.slice(-5)
+  const rowsPerDay = 11
+  const closes = []
+
+  days.forEach((day, dayIndex) => {
+    const dayClose = Number(day.price)
+    const previousClose = dayIndex === 0 ? dayClose : Number(days[dayIndex - 1].price)
+    for (let slot = 0; slot < rowsPerDay; slot += 1) {
+      const t = slot / Math.max(rowsPerDay - 1, 1)
+      const wave = slot === rowsPerDay - 1 ? 0 : Math.sin((dayIndex * rowsPerDay + slot) * 0.9 + symbol.charCodeAt(0)) * 0.0025
+      const close = previousClose + (dayClose - previousClose) * t + dayClose * wave
+      closes.push({ date: day.date, close: Number((slot === rowsPerDay - 1 ? dayClose : close).toFixed(2)) })
+    }
+  })
+
+  return closes.map((point, index) => {
+    const slot = index % rowsPerDay
+    const marketOpen = new Date(`${point.date}T13:30:00Z`)
+    const time = Math.floor((marketOpen.getTime() + slot * 39 * 60 * 1000) / 1000)
+    const close = point.close
+    const open = index === 0 ? close : closes[index - 1].close
+    const spread = Math.max(Math.abs(close - open) * 0.65, close * 0.0035)
+    const high = Math.max(open, close) + spread * (0.8 + (index % 5) * 0.08)
+    const low = Math.min(open, close) - spread * (0.72 + (index % 4) * 0.07)
+    return {
+      time,
+      open: Number(open.toFixed(2)),
+      high: Number(high.toFixed(2)),
+      low: Number(low.toFixed(2)),
+      close: Number(close.toFixed(2)),
+      value: Number(close.toFixed(2)),
+      volume: Math.round(650_000 + Math.abs(close - open) * 150_000 + (index % 7) * 95_000),
     }
   })
 }
