@@ -199,8 +199,13 @@ h1 { font-size: 18px; line-height: 1; }
 .catalyst-workbench { flex: 1; min-height: 520px; }
 .workbench-note { color: #8da2ba; font-size: 11px; line-height: 1.35; margin: 9px 0 6px; }
 .workbench-row { width: 100%; display: grid; grid-template-columns: 58px 1fr 92px; gap: 8px; align-items: start; border: 0; border-top: 1px solid rgba(75,97,123,.18); background: transparent; color: #c8d7ea; padding: 10px 0; text-align: left; cursor: pointer; }
-.workbench-row:hover { background: rgba(67,225,132,.05); color: #eef7ff; }
+.workbench-row:hover, .workbench-row.active { background: rgba(67,225,132,.05); color: #eef7ff; }
+.workbench-row.active { border-left: 2px solid #43e184; padding-left: 8px; }
 .workbench-row span { color: #7f94aa; font-size: 10px; text-transform: uppercase; font-weight: 900; letter-spacing: .06em; }
+.focused-catalyst { margin: 10px 0; border: 1px solid rgba(67,225,132,.28); border-radius: 10px; background: rgba(67,225,132,.07); padding: 10px; }
+.focused-catalyst span { display: block; color: #8da2ba; text-transform: uppercase; font-size: 10px; font-weight: 900; letter-spacing: .08em; }
+.focused-catalyst strong { display: block; color: #eef7ff; margin: 6px 0 9px; line-height: 1.35; }
+.focused-catalyst button { border: 1px solid rgba(67,225,132,.35); border-radius: 7px; background: rgba(67,225,132,.10); color: #c8f7d8; padding: 5px 8px; }
 .workbench-row strong { font-size: 12px; line-height: 1.35; }
 .workbench-row b { font-size: 10px; text-align: right; }
 .readout-workbench .workbench-row { grid-template-columns: 76px 1fr 118px; }

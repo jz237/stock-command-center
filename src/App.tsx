@@ -359,6 +359,7 @@ function App() {
   const [lastLiveUpdate, setLastLiveUpdate] = useState<string>('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [detailPanel, setDetailPanel] = useState<DetailPanel>(null)
+  const [focusedCatalyst, setFocusedCatalyst] = useState<string>('')
   const [marketSnapshots, setMarketSnapshots] = useState<Stock[]>(marketInstruments)
   const liveSymbolsKey = useMemo(() => stocks.map((stock) => stock.symbol).join('|'), [stocks])
   const stocksRef = useRef(stocks)
@@ -490,6 +491,7 @@ function App() {
     ...selected.opportunities.slice(0, 4).map((text, index) => ({ label: `Bull ${index + 1}`, type: 'Upside trigger', text, tone: 'up' })),
     ...selected.risks.slice(0, 4).map((text, index) => ({ label: `Risk ${index + 1}`, type: 'Downside trigger', text, tone: 'down' })),
   ]
+  const activeCatalyst = catalystWorkbench.find((item) => item.text === focusedCatalyst) || catalystWorkbench[0]
   const investmentReadout = [
     { label: 'Setup', value: setupLabel(selected), text: `${selected.symbol} is currently a ${setupLabel(selected).toLowerCase()} story based on conviction, recent move, and instrument type.`, tone: selected.change >= 0 ? 'up' : 'down' },
     { label: 'Why it matters', value: 'Thesis', text: selected.thesis, tone: 'neutral' },
@@ -565,6 +567,12 @@ function App() {
     }
   }
 
+  function openCatalysts(text?: string) {
+    if (text) setFocusedCatalyst(text)
+    else setFocusedCatalyst(selected.catalysts[0] || selected.opportunities[0] || selected.thesis)
+    openPanel('catalysts')
+  }
+
   function openCatalystArticle(text: string) {
     const query = encodeURIComponent(`${selected.symbol} ${selected.name} ${text}`)
     window.open(`https://www.google.com/search?tbm=nws&q=${query}`, '_blank', 'noopener,noreferrer')
@@ -585,7 +593,7 @@ function App() {
     <main className="terminal">
       <nav className="rail">
         <div className="signal"><i/><i/><i/></div>
-        {nav.map((item, index) => <button onClick={() => index === 0 ? openPanel('watchlist') : index === 1 ? openPanel('report') : index === 2 ? openPanel('catalysts') : index === 3 ? openPanel('risks') : setView('Portfolio')} className={index === 1 ? 'hot' : ''} key={item}>{item}</button>)}
+        {nav.map((item, index) => <button onClick={() => index === 0 ? openPanel('watchlist') : index === 1 ? openPanel('report') : index === 2 ? openCatalysts() : index === 3 ? openPanel('risks') : setView('Portfolio')} className={index === 1 ? 'hot' : ''} key={item}>{item}</button>)}
       </nav>
 
       <aside className="watch-panel panel">
@@ -636,7 +644,7 @@ function App() {
                   <span>Target <b>{compactMoney(selected.targetPrice)}</b></span><span>Target Gap <b className={selected.targetPrice && selected.targetPrice >= selected.price ? 'up' : 'down'}>{targetUpside(selected)}</b></span><span>Conviction <b>{selected.confidence}/100</b></span><span>Sector <b>{selected.sector}</b></span><span>Source <b>{sourceLabel(selected.dataSource)}</b></span>
                 </div>
               </div>
-              <div className="rangebar">{ranges.map((item) => <button className={range === item ? 'active' : ''} onClick={() => setRange(item)} key={item}>{item}</button>)}<button onClick={() => setIndicators(!indicators)} className="indicator">⌁ {indicators ? 'SMA on' : 'SMA off'}</button><button onClick={() => openPanel('report')}>⛶</button><button onClick={() => openPanel('catalysts')}>⋯</button></div>
+              <div className="rangebar">{ranges.map((item) => <button className={range === item ? 'active' : ''} onClick={() => setRange(item)} key={item}>{item}</button>)}<button onClick={() => setIndicators(!indicators)} className="indicator">⌁ {indicators ? 'SMA on' : 'SMA off'}</button><button onClick={() => openPanel('report')}>⛶</button><button onClick={() => openCatalysts()}>⋯</button></div>
               <div className="chart-toolbar"><div><strong>{range} performance</strong><span>{activeRange.label}</span></div><div className="chart-modes">{(['Line', 'Candles', 'Volume'] as ChartMode[]).map((mode) => <button className={chartMode === mode ? 'active' : ''} onClick={() => setChartMode(mode)} key={mode}>{mode}</button>)}</div><b className={chartChange >= 0 ? 'up' : 'down'}>{chartChange >= 0 ? '+' : ''}{chartChange.toFixed(2)}%</b></div>
               <div className="chart-wrap">
                 <HighResolutionChart stock={selected} range={range} chartMode={chartMode} indicators={indicators} />
@@ -650,7 +658,7 @@ function App() {
 
             <section className="research-deck">
               <article className="panel research-slice readout-slice" onClick={() => openPanel('research')}><div className="card-title">Investment Readout <button>{selected.symbol}</button></div><strong>{setupLabel(selected)}</strong><p>{actionPosture(selected)} · {selected.thesis}</p></article>
-              <article className="panel research-slice"><div className="card-title">Catalysts to Watch</div>{selected.catalysts.slice(0,4).map((item) => <button onClick={() => openPanel('catalysts')} className="mini-catalyst" key={item}>{item}</button>)}</article>
+              <article className="panel research-slice"><div className="card-title">Catalysts to Watch</div>{selected.catalysts.slice(0,4).map((item) => <button onClick={() => openCatalysts(item)} className="mini-catalyst" key={item}>{item}</button>)}</article>
               <article className="panel research-slice"><div className="card-title">Decision Frame</div><p><b className="up">Bull case:</b> {selected.opportunities[0]}</p><p><b className="down">Risk:</b> {selected.risks[0]}</p></article>
             </section>
 
@@ -667,15 +675,15 @@ function App() {
             </section>
 
             <section className="terminal-grid">
-              <article className="panel dense-list catalyst-radar-wide"><div className="card-title">Catalyst Radar <button onClick={() => openPanel('catalysts')}>{selected.symbol}</button></div>{catalystRadar.map((item) => <button className="radar-row" onClick={() => openPanel('catalysts')} key={`${item.label}-${item.text}`}><strong>{item.label}</strong><span>{item.text}</span><b className={item.tone}>{item.type}</b></button>)}</article>
+              <article className="panel dense-list catalyst-radar-wide"><div className="card-title">Catalyst Radar <button onClick={() => openCatalysts()}>{selected.symbol}</button></div>{catalystRadar.map((item) => <button className="radar-row" onClick={() => openCatalysts(item.text)} key={`${item.label}-${item.text}`}><strong>{item.label}</strong><span>{item.text}</span><b className={item.tone}>{item.type}</b></button>)}</article>
               <article className="panel dense-list"><div className="card-title">Risk Matrix</div>{selected.risks.slice(0,4).map((item, index) => <p key={item}><strong>R{index + 1}</strong><span>{item}</span><b className="down">Watch</b></p>)}</article>
               <article className="panel dense-list"><div className="card-title">Opportunity Matrix</div>{selected.opportunities.slice(0,4).map((item, index) => <p key={item}><strong>O{index + 1}</strong><span>{item}</span><b className="up">Open</b></p>)}</article>
             </section>
           </section>
 
           <aside className={`right-stack ${detailPanel === 'catalysts' || detailPanel === 'research' ? 'catalyst-mode' : ''}`}>
-            {detailPanel === 'research' ? <section className="panel catalyst-workbench readout-workbench"><div className="card-title">{selected.symbol} Investment Readout <button onClick={closePanel}>Collapse</button></div><p className="workbench-note">Plain-English decision frame for the selected stock or market instrument.</p>{investmentReadout.map((item) => <button className="workbench-row" onClick={() => openPanel('report')} key={`${item.label}-${item.text}`}><span>{item.label}</span><strong>{item.text}</strong><b className={item.tone}>{item.value}</b></button>)}</section> : detailPanel === 'catalysts' ? <section className="panel catalyst-workbench"><div className="card-title">{selected.symbol} Catalyst Workbench <button onClick={closePanel}>Collapse</button></div><p className="workbench-note">Click any item to open a live news search for that catalyst.</p>{catalystWorkbench.map((item) => <button className="workbench-row" onClick={() => openCatalystArticle(item.text)} key={`${item.label}-${item.text}`}><span>{item.label}</span><strong>{item.text}</strong><b className={item.tone}>{item.type}</b></button>)}</section> : <>
-            <section className="panel catalyst-card"><div className="card-title">Catalyst Radar <button onClick={() => openPanel('catalysts')}>{selected.symbol}</button></div>{catalystRadar.map((item) => <article key={`${selected.symbol}-${item.label}`} onClick={() => openPanel('catalysts')}><span>{item.label}</span><strong>{item.text}</strong><b className={`${item.tone} badge`}>{item.type}</b></article>)}</section>
+            {detailPanel === 'research' ? <section className="panel catalyst-workbench readout-workbench"><div className="card-title">{selected.symbol} Investment Readout <button onClick={closePanel}>Collapse</button></div><p className="workbench-note">Plain-English decision frame for the selected stock or market instrument.</p>{investmentReadout.map((item) => <button className="workbench-row" onClick={() => openPanel('report')} key={`${item.label}-${item.text}`}><span>{item.label}</span><strong>{item.text}</strong><b className={item.tone}>{item.value}</b></button>)}</section> : detailPanel === 'catalysts' ? <section className="panel catalyst-workbench"><div className="card-title">{selected.symbol} Catalyst Workbench <button onClick={closePanel}>Collapse</button></div>{activeCatalyst && <div className="focused-catalyst"><span>Focused catalyst</span><strong>{activeCatalyst.text}</strong><button onClick={() => openCatalystArticle(activeCatalyst.text)}>Open news</button></div>}<p className="workbench-note">Catalyst mode stays active as you change stocks. Click any item to open a live news search.</p>{catalystWorkbench.map((item) => <button className={`workbench-row ${activeCatalyst?.text === item.text ? 'active' : ''}`} onClick={() => { setFocusedCatalyst(item.text); openCatalystArticle(item.text) }} key={`${item.label}-${item.text}`}><span>{item.label}</span><strong>{item.text}</strong><b className={item.tone}>{item.type}</b></button>)}</section> : <>
+            <section className="panel catalyst-card"><div className="card-title">Catalyst Radar <button onClick={() => openCatalysts()}>{selected.symbol}</button></div>{catalystRadar.map((item) => <article key={`${selected.symbol}-${item.label}`} onClick={() => openCatalysts(item.text)}><span>{item.label}</span><strong>{item.text}</strong><b className={`${item.tone} badge`}>{item.type}</b></article>)}</section>
             <section className="panel ai-card"><div className="ai-label">AI</div><div className="card-title">AI Research Summary</div><h2>{selected.symbol} <small>{selected.name}</small></h2><b className="rating">⌁ {selected.confidence > 82 ? 'Strong Bullish' : selected.confidence > 68 ? 'Constructive' : 'Watch Carefully'}</b><p>{view === 'News' ? selected.catalysts.join(' · ') : view === 'Portfolio' ? `${selected.symbol} portfolio exposure can be tracked here. Save it, monitor catalysts, and compare it against the rest of the watchlist.` : selected.thesis}</p><div className="drivers"><span>Key Drivers</span>{selected.opportunities.slice(0,4).map((item) => <em key={item}>● {item}</em>)}</div><button onClick={() => openPanel('report')} className="full-report">View Full Research Report ›</button></section>
             {view === 'Portfolio' && <section className="panel holdings-editor"><div className="card-title">Public Tracker <button onClick={addSelectedHolding}>Track {selected.symbol}</button></div>{positions.map((position) => <div className="holding-row public" key={position.symbol}><strong>{position.symbol}</strong><span>{position.stock ? `$${money(position.stock.price)}` : 'No quote'}</span><b className={position.stock && position.stock.change >= 0 ? 'up' : 'down'}>{position.stock ? `${position.stock.change >= 0 ? '+' : ''}${position.stock.change.toFixed(2)}%` : '—'}</b></div>)}<small>Only ticker symbols and market performance are stored here. Cash, share counts, cost basis, and personal portfolio values are intentionally not included.</small></section>}
             <section className="panel risks"><div className="card-title">Risks & Opportunities <button onClick={() => openPanel('risks')}>View all</button></div><h3>Opportunities</h3>{selected.opportunities.slice(0,2).map((item) => <p className="good" key={item}>● {item}</p>)}<h3>Risks</h3>{selected.risks.slice(0,2).map((item) => <p className="bad" key={item}>● {item}</p>)}<button onClick={toggleSave} className="save">★ {inPortfolio ? 'Saved to Portfolio' : 'Save to Portfolio'}</button></section>
