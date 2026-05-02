@@ -470,8 +470,6 @@ function App() {
     return matchesQuery && matchesCategory
   }), [categoryFilter, portfolio.positions, query, stocks])
   const positions = portfolio.positions.map((position) => ({ ...position, stock: stocks.find((stock) => stock.symbol === position.symbol) })).filter((p) => p.stock)
-  const averageChange = positions.length ? positions.reduce((sum, position) => sum + (position.stock?.change || 0), 0) / positions.length : 0
-  const gainers = positions.filter((position) => (position.stock?.change || 0) >= 0).length
   const grouped = stocks.reduce<Record<string, Stock[]>>((acc, stock) => {
     const key = stock.sector.includes('Semi') ? 'Semiconductors' : stock.sector.includes('Cloud') || stock.sector.includes('Software') ? 'Software' : stock.sector.includes('Consumer') ? 'Consumer Electronics' : stock.sector.includes('Communication') ? 'Consumer / Internet' : stock.sector.includes('Industrial') ? 'Industrials' : stock.sector
     acc[key] = [...(acc[key] || []), stock]
@@ -480,7 +478,10 @@ function App() {
   const sectorBoard = ['Semiconductors', 'Software', 'Consumer / Internet', 'Consumer Electronics', 'Industrials']
     .map((group) => ({ group, items: grouped[group] || [] }))
     .filter(({ items }) => items.length)
-  const movers = [...stocks].sort((a, b) => b.change - a.change).slice(0, 5)
+  const movers = [...stocks]
+    .filter((stock) => Number.isFinite(stock.change) && Number.isFinite(stock.price))
+    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
+    .slice(0, 8)
   const catalystRadar = [
     { label: 'Now', type: 'Primary', text: selected.catalysts[0] || selected.thesis, tone: selected.change >= 0 ? 'up' : 'down' },
     { label: 'Next', type: 'Bull trigger', text: selected.catalysts[1] || selected.opportunities[0] || 'Watch for confirmation in the next major update.', tone: 'up' },
@@ -669,10 +670,8 @@ function App() {
               {peerRows.map((stock) => <button key={stock.symbol} onClick={() => setSelectedSymbol(stock.symbol)} className={stock.symbol === selected.symbol ? 'active' : ''}><strong>{stock.symbol}</strong><span>{stock.name}</span><span>{stock.sector === 'Rates' ? `${money(stock.price)}%` : `$${money(stock.price)}`}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><span>{stock.marketCap}</span><span>{stock.pe ? stock.pe.toFixed(1) : '—'}</span><span>{stock.rating || 'Watch'}</span><span>{stock.confidence}/100</span><b className={stock.targetPrice && stock.targetPrice >= stock.price ? 'up' : 'down'}>{targetUpside(stock)}</b><svg viewBox="0 0 96 22"><path d={sparkPath(stock.chart, 96, 22)} /></svg></button>)}
             </section>
 
-            <section className="bottom-grid">
-              <div className="panel portfolio-card"><div className="card-title">Public Watchlist <button onClick={() => setView('Portfolio')}>No personal amounts</button></div><strong>{positions.length} tickers</strong><span className={averageChange >= 0 ? 'up' : 'down'}>{averageChange >= 0 ? '+' : ''}{averageChange.toFixed(2)}% average move · {gainers}/{positions.length} green</span><svg viewBox="0 0 280 90"><path d="M0 62 C35 20 70 84 105 46 S175 60 210 26 S250 55 280 18" /></svg><div className="mini-tabs">{['1D','1W','1M','3M','YTD','1Y','ALL'].map((x, i)=><button onClick={() => setRange(x)} className={range===x || (range === 'MAX' && x === 'ALL') || (i===0 && range==='1D')?'active':''} key={x}>{x}</button>)}</div></div>
-              <div className="panel allocation"><div className="card-title">Watchlist Breakdown <button onClick={() => setView('Portfolio')}>Public</button></div><div className="donut"><b>{positions.length}</b><small>Names</small></div><ul><li><i/>Technology / AI <b>Core</b></li><li><i/>Semiconductors <b>Major</b></li><li><i/>Software & Cloud <b>Major</b></li><li><i/>Personal values <b>Hidden</b></li></ul></div>
-              <div className="panel movers"><div className="card-title">Today’s Top Movers</div>{movers.map((stock) => <button onClick={() => setSelectedSymbol(stock.symbol)} key={stock.symbol}><strong>{stock.symbol}</strong><svg viewBox="0 0 70 22"><path d={sparkPath(stock.chart, 70, 22)} /></svg><span>{money(stock.price)}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b></button>)}</div>
+            <section className="bottom-grid movers-grid">
+              <div className="panel movers"><div className="card-title">Today’s Top Movers <button>{liveStatus === 'live' ? `Live ${lastLiveUpdate}` : 'Cached'}</button></div>{movers.map((stock) => <button onClick={() => setSelectedSymbol(stock.symbol)} key={stock.symbol}><strong>{stock.symbol}</strong><svg viewBox="0 0 96 24"><path d={sparkPath(stock.chart, 96, 24)} /></svg><span>{stock.name}</span><span>${money(stock.price)}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><small>{stock.sector}</small></button>)}</div>
             </section>
 
             <section className="terminal-grid">

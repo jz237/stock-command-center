@@ -173,8 +173,9 @@ h1 { font-size: 18px; line-height: 1; }
 .peer-table svg { width: 96px; height: 22px; }
 .peer-table path { fill: none; stroke: #52df82; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 
-.bottom-grid { display: grid; grid-template-columns: 1.1fr .9fr 1fr; gap: 8px; min-height: 150px; overflow: hidden; }
+.bottom-grid { display: grid; grid-template-columns: 1fr; gap: 8px; min-height: 150px; overflow: hidden; }
 .bottom-grid .panel, .right-stack .panel { border-radius: 10px; padding: 10px; }
+.movers-grid { min-height: 0; }
 .portfolio-card > strong { display:block; font-size: 18px; margin-top: 7px; }
 .portfolio-card svg { display: block; width: 100%; height: 44px; margin-top: 4px; }
 .portfolio-card path, .market-summary path { fill: none; stroke: #7d67ff; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 8px rgba(125,103,255,.45)); }
@@ -190,8 +191,11 @@ h1 { font-size: 18px; line-height: 1; }
 .allocation ul { list-style: none; margin: 9px 0 0; padding: 0; font-size: 10px; color: #a9bdd2; }
 .allocation li { display: flex; justify-content: space-between; margin: 6px 0; gap: 8px; }
 .allocation i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #714df7; margin-right: 6px; }
-.movers button { width: 100%; display: grid; grid-template-columns: 38px 58px 1fr 48px; gap: 6px; align-items: center; border: 0; border-bottom: 1px solid rgba(75,97,123,.18); background: transparent; color: #dbe8f6; padding: 5px 0; text-align: left; font-size: 11px; }
-.movers button:nth-of-type(n+5) { display: none; }
+.movers button { width: 100%; display: grid; grid-template-columns: 52px 104px minmax(150px, 1fr) 82px 58px 120px; gap: 9px; align-items: center; border: 0; border-bottom: 1px solid rgba(75,97,123,.18); background: transparent; color: #dbe8f6; padding: 7px 0; text-align: left; font-size: 11px; }
+.movers button:hover { background: rgba(67,225,132,.05); }
+.movers svg { width: 96px; height: 24px; }
+.movers span, .movers small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.movers small { color: #7f94aa; }
 
 .catalyst-card article { display: grid; grid-template-columns: 42px 1fr 74px; gap: 7px; align-items: start; padding: 8px 0; border-bottom: 1px solid rgba(75,97,123,.18); cursor: pointer; }
 .catalyst-card article:hover strong { color: #eef7ff; }
