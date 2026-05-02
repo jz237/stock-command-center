@@ -4,6 +4,7 @@ import './App.css'
 
 type Stock = {
   symbol: string
+  dataSymbol?: string
   name: string
   sector: string
   price: number
@@ -64,6 +65,18 @@ const nav = ['▦', '▧', '▤', '▭', '⚙']
 const LIVE_REFRESH_MS = 120_000
 const minCachedChartRows: Record<string, number> = { '1D': 20, '5D': 10, '1M': 15, '3M': 40, '6M': 80, YTD: 20, '1Y': 160, '5Y': 150, MAX: 80 }
 
+const marketInstruments: Stock[] = [
+  { symbol: 'S&P', dataSymbol: '^GSPC', name: 'S&P 500', sector: 'Market Index', price: 5321, change: 0.71, marketCap: 'Index', pe: null, rating: 'Benchmark', confidence: 100, thesis: 'Broad U.S. large-cap market benchmark.', risks: ['Market-wide risk', 'Rate sensitivity'], opportunities: ['Broad equity exposure', 'Risk appetite proxy'], catalysts: ['Fed commentary', 'Earnings breadth', 'Index flows'], chart: [5260, 5284, 5273, 5302, 5321], volume: undefined, dataSource: 'static' },
+  { symbol: 'NASDAQ', dataSymbol: '^IXIC', name: 'Nasdaq Composite', sector: 'Market Index', price: 18204, change: 1.04, marketCap: 'Index', pe: null, rating: 'Tech Beta', confidence: 100, thesis: 'Growth and technology-heavy market benchmark.', risks: ['High-duration tech sensitivity', 'AI trade crowding'], opportunities: ['AI/software leadership', 'Liquidity-driven rallies'], catalysts: ['Mega-cap earnings', 'Semiconductor demand', 'Rate moves'], chart: [17960, 18084, 18020, 18144, 18204], dataSource: 'static' },
+  { symbol: 'DOW', dataSymbol: '^DJI', name: 'Dow Jones Industrial Average', sector: 'Market Index', price: 39872, change: 0.34, marketCap: 'Index', pe: null, rating: 'Cyclical', confidence: 100, thesis: 'Blue-chip industrial and value-oriented market gauge.', risks: ['Industrial slowdown', 'Defensive rotation'], opportunities: ['Value catch-up', 'Dividend stability'], catalysts: ['Industrial data', 'Bank/healthcare moves'], chart: [39680, 39720, 39695, 39810, 39872], dataSource: 'static' },
+  { symbol: 'VIX', dataSymbol: '^VIX', name: 'CBOE Volatility Index', sector: 'Volatility', price: 12.48, change: -4.32, marketCap: 'Volatility', pe: null, rating: 'Fear Gauge', confidence: 100, thesis: 'Options-market stress gauge; lower usually means calmer equity conditions.', risks: ['Sudden risk-off spike', 'Event volatility'], opportunities: ['Calm-market confirmation', 'Hedge timing signal'], catalysts: ['Macro shocks', 'Fed surprises', 'Earnings events'], chart: [13.5, 13.1, 12.9, 12.7, 12.48], dataSource: 'static' },
+  { symbol: '10Y', dataSymbol: '^TNX', name: 'U.S. 10-Year Treasury Yield', sector: 'Rates', price: 4.21, change: -0.06, marketCap: 'Yield', pe: null, rating: 'Rates', confidence: 100, thesis: 'The key long-rate signal for growth stock pressure and valuation appetite.', risks: ['Higher yields pressure tech', 'Inflation surprise'], opportunities: ['Lower yields support growth stocks', 'Policy easing signal'], catalysts: ['CPI/PCE', 'Fed speeches', 'Treasury auctions'], chart: [4.28, 4.25, 4.24, 4.22, 4.21], dataSource: 'static' },
+  { symbol: 'DXY', dataSymbol: 'DX-Y.NYB', name: 'U.S. Dollar Index', sector: 'Currency', price: 103.2, change: -0.18, marketCap: 'FX Index', pe: null, rating: 'Dollar', confidence: 100, thesis: 'Dollar strength/weakness proxy for global liquidity and multinational earnings translation.', risks: ['Dollar spike tightens conditions', 'FX translation drag'], opportunities: ['Weaker dollar can help risk assets', 'Global revenue translation support'], catalysts: ['Rate differentials', 'Global growth data'], chart: [103.8, 103.6, 103.4, 103.3, 103.2], dataSource: 'static' },
+  { symbol: 'BTC', dataSymbol: 'BTC-USD', name: 'Bitcoin', sector: 'Crypto', price: 91400, change: 2.12, marketCap: 'Crypto', pe: null, rating: 'Risk Appetite', confidence: 100, thesis: 'High-beta liquidity and risk-appetite signal.', risks: ['Crypto volatility', 'Regulatory shock'], opportunities: ['Liquidity expansion signal', 'Institutional flow'], catalysts: ['ETF flows', 'Dollar/yield moves'], chart: [88400, 89500, 90200, 90850, 91400], dataSource: 'static' },
+  { symbol: 'WTI', dataSymbol: 'CL=F', name: 'WTI Crude Oil', sector: 'Commodities', price: 78.2, change: 0.42, marketCap: 'Commodity', pe: null, rating: 'Inflation Input', confidence: 100, thesis: 'Oil price signal for inflation pressure and energy/geopolitical risk.', risks: ['Inflation pressure', 'Supply shock'], opportunities: ['Demand strength signal', 'Energy-sector support'], catalysts: ['OPEC', 'Inventory data', 'Geopolitics'], chart: [77.4, 77.9, 77.6, 78.0, 78.2], dataSource: 'static' },
+  { symbol: 'GOLD', dataSymbol: 'GC=F', name: 'Gold Futures', sector: 'Commodities', price: 2381, change: -0.22, marketCap: 'Commodity', pe: null, rating: 'Hedge', confidence: 100, thesis: 'Safe-haven and real-rate sensitivity signal.', risks: ['Real yields rising', 'Dollar strength'], opportunities: ['Hedge demand', 'Lower-rate support'], catalysts: ['Real yields', 'Central-bank buying', 'Geopolitical risk'], chart: [2390, 2388, 2384, 2386, 2381], dataSource: 'static' },
+]
+
 function sparkPath(values: number[], width = 96, height = 34) {
   const min = Math.min(...values)
   const max = Math.max(...values)
@@ -97,6 +110,11 @@ function targetUpside(stock: Stock) {
 
 function sourceLabel(source?: Stock['dataSource']) {
   return source === 'live' ? 'Live quote' : source === 'stockbot' ? 'StockBot' : 'Static'
+}
+
+function normalizeChartRows(rows: ChartRow[], stock: Stock) {
+  if (stock.dataSymbol !== '^TNX') return rows
+  return rows.map((row) => ({ ...row, open: row.open / 10, high: row.high / 10, low: row.low / 10, close: row.close / 10, value: row.value / 10 }))
 }
 
 function expandedSeries(stock: Stock, range: string) {
@@ -240,17 +258,18 @@ function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMod
       if (!historyRef.current) {
         historyRef.current = await fetch(`${import.meta.env.BASE_URL}data/history.json`).then((r) => r.json()).catch(() => null)
       }
-      const cached = historyRef.current?.stocks?.[stock.symbol]?.[range]
+      const chartSymbol = stock.dataSymbol || stock.symbol
+      const cached = historyRef.current?.stocks?.[chartSymbol]?.[range]
       if (cancelled) return
       if (cached && cached.length >= (minCachedChartRows[range] || 2)) {
         setRows(cached.map((row) => ({ ...row, value: row.close })))
         setSource('cached')
         return
       }
-      const history = await fetchYahooHistory(stock.symbol, range)
+      const history = await fetchYahooHistory(chartSymbol, range)
       if (cancelled) return
       if (history?.length) {
-        setRows(history)
+        setRows(normalizeChartRows(history, stock))
         setSource('live')
         return
       }
@@ -406,7 +425,9 @@ function App() {
     setIsRefreshing(false)
   }
 
-  const selected = stocks.find((stock) => stock.symbol === selectedSymbol) || stocks[0]
+  const allInstruments = useMemo(() => [...stocks, ...marketInstruments], [stocks])
+  const selected = allInstruments.find((stock) => stock.symbol === selectedSymbol) || stocks[0]
+  const isMarketSelection = marketInstruments.some((item) => item.symbol === selected.symbol)
   const filtered = useMemo(() => stocks.filter((stock) => {
     const matchesQuery = `${stock.symbol} ${stock.name}`.toLowerCase().includes(query.toLowerCase())
     const matchesCategory = !categoryFilter
@@ -430,17 +451,10 @@ function App() {
   const visibleWatchlist = query || categoryFilter ? filtered : stocks
   const hiddenWatchlistCount = query || categoryFilter ? 0 : Math.max(0, stocks.length - visibleWatchlist.length)
   const inPortfolio = saved.includes(selected.symbol)
-  const marketStrip = [
-    { symbol: 'S&P', value: '5,321', change: 0.71 },
-    { symbol: 'NASDAQ', value: '18,204', change: 1.04 },
-    { symbol: 'DOW', value: '39,872', change: 0.34 },
-    { symbol: 'VIX', value: '12.48', change: -4.32 },
-    { symbol: '10Y', value: '4.21%', change: -0.06 },
-    { symbol: 'DXY', value: '103.2', change: -0.18 },
-    { symbol: 'BTC', value: '91.4K', change: 2.12 },
-    { symbol: 'WTI', value: '78.20', change: 0.42 },
-    { symbol: 'GOLD', value: '2,381', change: -0.22 },
-  ]
+  const marketStrip = marketInstruments.map((item) => ({
+    ...item,
+    value: item.symbol === '10Y' ? `${item.price.toFixed(2)}%` : item.price >= 1000 ? item.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : money(item.price),
+  }))
   const peerRows = [...stocks]
     .filter((stock) => stock.sector === selected.sector || stock.symbol === selected.symbol)
     .sort((a, b) => b.confidence - a.confidence)
@@ -552,15 +566,15 @@ function App() {
         </header>
 
         <section className="market-strip panel">
-          {marketStrip.map((item) => <button onClick={() => openPanel('catalysts')} key={item.symbol}><strong>{item.symbol}</strong><span>{item.value}</span><b className={item.change >= 0 ? 'up' : 'down'}>{item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%</b><svg viewBox="0 0 48 14"><path d="M0 10 L7 8 L13 9 L20 5 L27 7 L34 3 L41 5 L48 2" /></svg></button>)}
+          {marketStrip.map((item) => <button onClick={() => setSelectedSymbol(item.symbol)} className={selected.symbol === item.symbol ? 'active' : ''} key={item.symbol}><strong>{item.symbol}</strong><span>{item.value}</span><b className={item.change >= 0 ? 'up' : 'down'}>{item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%</b><svg viewBox="0 0 48 14"><path d="M0 10 L7 8 L13 9 L20 5 L27 7 L34 3 L41 5 L48 2" /></svg></button>)}
         </section>
 
         <div className="content-grid">
           <section className="main-stack">
             <section className="chart-panel panel">
               <div className="quote-head">
-                <div><h1>{selected.symbol}</h1><strong>{money(selected.price)}</strong><span className={selected.change >= 0 ? 'up' : 'down'}>{selected.change >= 0 ? '+' : ''}{(selected.price * selected.change / 100).toFixed(2)} ({selected.change.toFixed(2)}%)</span><small className="source">{selected.dataSource === 'live' ? 'Yahoo Finance live feed' : 'StockBot cached data'}</small></div>
-                <button onClick={toggleSave} className="star">★</button>
+                <div><h1>{selected.symbol}</h1><strong>{money(selected.price)}</strong><span className={selected.change >= 0 ? 'up' : 'down'}>{selected.change >= 0 ? '+' : ''}{(selected.price * selected.change / 100).toFixed(2)} ({selected.change.toFixed(2)}%)</span><small className="source">{isMarketSelection ? 'Market benchmark snapshot' : selected.dataSource === 'live' ? 'Yahoo Finance live feed' : 'StockBot cached data'}</small></div>
+                {!isMarketSelection && <button onClick={toggleSave} className="star">★</button>}
                 <div className="quote-stats">
                   <span>Market Cap <b>{selected.marketCap}</b></span><span>P/E <b>{selected.pe ? selected.pe.toFixed(2) : '—'}</b></span><span>Rating <b>{selected.rating || 'Watch'}</b></span><span>Volume <b>{selected.volume || '—'}M</b></span><span>52W Range <b>{selected.range52w?.[0] && selected.range52w?.[1] ? `${selected.range52w[0]} - ${selected.range52w[1]}` : '—'}</b></span>
                   <span>Target <b>{compactMoney(selected.targetPrice)}</b></span><span>Target Gap <b className={selected.targetPrice && selected.targetPrice >= selected.price ? 'up' : 'down'}>{targetUpside(selected)}</b></span><span>Conviction <b>{selected.confidence}/100</b></span><span>Sector <b>{selected.sector}</b></span><span>Source <b>{sourceLabel(selected.dataSource)}</b></span>
