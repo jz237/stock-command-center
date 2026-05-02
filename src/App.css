@@ -71,7 +71,7 @@ em { font-style: normal; }
 .live-chip button { margin-left: 4px; border: 1px solid rgba(67,225,132,.35); border-radius: 999px; background: rgba(67,225,132,.08); color: #d9ffe8; padding: 4px 9px; font-size: 11px; }
 .live-chip button:disabled { opacity: .55; cursor: wait; }
 .avatar { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: #111d2a; border: 1px solid #27384e; font-weight: 800; font-size: 11px; }
-.content-grid { display: grid; grid-template-columns: minmax(620px, 1fr) 326px; gap: 8px; height: calc(100vh - 56px); overflow: hidden; }
+.content-grid { display: grid; grid-template-columns: minmax(620px, 1fr) 340px; gap: 8px; height: calc(100vh - 56px); overflow: hidden; }
 .main-stack, .right-stack { display: flex; flex-direction: column; gap: 8px; min-width: 0; overflow: hidden; }
 
 .chart-panel { border-radius: 10px; overflow: hidden; }
@@ -88,7 +88,7 @@ h1 { font-size: 18px; line-height: 1; }
 .rangebar button { height: 23px; border: 0; border-radius: 5px; color: #91a8c2; background: transparent; padding: 0 7px; font-size: 10px; }
 .rangebar .active, .rangebar button:hover { background: rgba(120,93,252,.35); color: #fff; }
 .rangebar .indicator { margin-left: auto; border: 1px solid #26384d; background: #0b1724; }
-.big-chart { width: 100%; height: 220px; background: linear-gradient(180deg, rgba(9,32,35,.9), rgba(5,15,28,.94)); }
+.big-chart { width: 100%; height: 190px; background: linear-gradient(180deg, rgba(9,32,35,.9), rgba(5,15,28,.94)); }
 .grid { stroke: rgba(92,114,140,.18); stroke-width: 1; }
 .line { fill: none; stroke: #29d681; stroke-width: 3.5; filter: drop-shadow(0 0 10px rgba(41,214,129,.5)); }
 .ma { fill: none; stroke: rgba(125,103,255,.9); stroke-width: 2; stroke-dasharray: 6 6; }
@@ -98,7 +98,7 @@ h1 { font-size: 18px; line-height: 1; }
 .greenvol { fill: rgba(64,217,130,.32); }
 .redvol { fill: rgba(240,82,104,.32); }
 
-.heat-panel { min-height: 172px; max-height: 172px; border-radius: 10px; display: grid; grid-template-columns: 1.1fr .9fr .9fr; gap: 1px; overflow: hidden; background: #142033; }
+.heat-panel { min-height: 148px; max-height: 148px; border-radius: 10px; display: grid; grid-template-columns: 1.1fr .9fr .9fr; gap: 1px; overflow: hidden; background: #142033; }
 .heat-sector { background: #07111d; min-height: 120px; display: flex; flex-direction: column; }
 .heat-sector > span { height: 22px; padding: 5px 8px; color: #a8b9ce; background: #0b1724; text-transform: uppercase; font-size: 10px; font-weight: 800; }
 .heat-sector > div { flex: 1; display: flex; flex-wrap: wrap; gap: 1px; }
@@ -115,25 +115,25 @@ h1 { font-size: 18px; line-height: 1; }
 .research-slice p { color: #b9c8dc; font-size: 11px; line-height: 1.35; margin-top: 5px; }
 .mini-catalyst { display: block; width: 100%; margin-top: 5px; text-align: left; border: 1px solid rgba(75,97,123,.22); border-radius: 7px; background: rgba(255,255,255,.025); color: #dbe8f6; padding: 5px 7px; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.bottom-grid { display: none; }
+.bottom-grid { display: grid; grid-template-columns: 1.1fr .9fr 1fr; gap: 8px; flex: 1 1 0; min-height: 124px; overflow: hidden; }
 .bottom-grid .panel, .right-stack .panel { border-radius: 10px; padding: 10px; }
 .portfolio-card > strong { display:block; font-size: 18px; margin-top: 7px; }
-.portfolio-card svg, .mini-tabs { display: none; }
+.portfolio-card svg { display: block; width: 100%; height: 44px; margin-top: 4px; }
 .portfolio-card path, .market-summary path { fill: none; stroke: #7d67ff; stroke-width: 3; filter: drop-shadow(0 0 8px rgba(125,103,255,.45)); }
 .mini-tabs { display: flex; gap: 6px; }
 .mini-tabs button { border: 0; border-radius: 5px; background: transparent; color: #8da2bb; padding: 5px 10px; }
 .mini-tabs .active { background: #6c4df7; color: #fff; }
 .allocation { display: grid; grid-template-columns: 128px 1fr; column-gap: 12px; }
 .allocation .card-title { grid-column: 1 / -1; }
-.donut { width: 48px; height: 48px; margin-top: 7px; border-radius: 50%; background: conic-gradient(#714df7 0 58%, #29c681 58% 72%, #f05268 72% 84%, #38bdf8 84% 94%, #39475b 94%); display: grid; place-items: center; position: relative; text-align: center; }
-.donut:before { content: ''; position: absolute; inset: 12px; border-radius: 50%; background: #0b1724; }
+.donut { width: 68px; height: 68px; margin-top: 9px; border-radius: 50%; background: conic-gradient(#714df7 0 58%, #29c681 58% 72%, #f05268 72% 84%, #38bdf8 84% 94%, #39475b 94%); display: grid; place-items: center; position: relative; text-align: center; }
+.donut:before { content: ''; position: absolute; inset: 17px; border-radius: 50%; background: #0b1724; }
 .donut b, .donut small { position: relative; }
 .donut small { display: block; color: #8ea3bc; }
-.allocation ul { display: none; }
+.allocation ul { list-style: none; margin: 9px 0 0; padding: 0; font-size: 10px; color: #a9bdd2; }
 .allocation li { display: flex; justify-content: space-between; margin: 6px 0; gap: 8px; }
 .allocation i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #714df7; margin-right: 6px; }
 .movers button { width: 100%; display: grid; grid-template-columns: 38px 58px 1fr 48px; gap: 6px; align-items: center; border: 0; border-bottom: 1px solid rgba(75,97,123,.18); background: transparent; color: #dbe8f6; padding: 5px 0; text-align: left; font-size: 11px; }
-.movers button:nth-of-type(n+3) { display: none; }
+.movers button:nth-of-type(n+5) { display: none; }
 
 .catalyst-card article { display: grid; grid-template-columns: 38px 1fr 54px; gap: 6px; align-items: start; padding: 7px 0; border-bottom: 1px solid rgba(75,97,123,.18); }
 .catalyst-card span { color: #7f94aa; font-size: 12px; }
@@ -169,7 +169,7 @@ h1 { font-size: 18px; line-height: 1; }
 .breadth b { display:block; color: #dbe8f6; margin-top: 3px; }
 .bar { display: flex; height: 9px; border-radius: 999px; overflow: hidden; margin-top: 14px; background: #263244; }
 .bar i:nth-child(1){flex: 7; background:#38df86}.bar i:nth-child(2){flex:2; background:#f05268}.bar i:nth-child(3){flex:1; background:#506073}
-.market-summary { display: none; }
+.market-summary { display: block; flex: 1 1 0; min-height: 0; }
 
 @media (max-width: 1320px) {
   .terminal { grid-template-columns: 54px 250px minmax(700px, 1fr); }
