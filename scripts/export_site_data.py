@@ -125,12 +125,11 @@ def main():
             "thesis": clean_profile(profile_text),
             "risks": extract_bullets(profile_text, "risk", ["High expectations can punish minor execution misses", "Sensitive to broad tech selloffs", "Earnings guidance can reset the story quickly"]),
             "opportunities": extract_bullets(profile_text, "opportunit", ["AI infrastructure demand remains the dominant theme", "Operating leverage can lift earnings if growth holds", "Fresh catalysts can rapidly improve sentiment"]),
-            "catalysts": list(dict.fromkeys([latest.get("headline"), "Next earnings update", "Analyst target changes", "AI capex commentary"]))[:4],
+            "catalysts": [item for item in dict.fromkeys([latest.get("headline"), "Next earnings update", "Analyst target changes", "AI capex commentary"]) if item][:4],
             "chart": chart_from_history(entries, price),
             "volume": round(15 + abs(change) * 9 + (confidence - 50) / 4, 1),
         })
 
-    payload = {"stocks": stocks, "updatedAt": "Generated from StockBot workspace"}
     portfolio_payload = {
         "cash": 18420,
         "positions": [
@@ -143,7 +142,7 @@ def main():
     }
     for directory in (PUBLIC, DIST):
         directory.mkdir(parents=True, exist_ok=True)
-        (directory / "stocks.json").write_text(json.dumps(payload, indent=2))
+        (directory / "stocks.json").write_text(json.dumps(stocks, indent=2) + "\n")
         (directory / "portfolio.json").write_text(json.dumps(portfolio_payload, indent=2))
 
 

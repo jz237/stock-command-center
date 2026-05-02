@@ -137,6 +137,12 @@ h1 { font-size: 22px; line-height: 1; }
 .drivers span { display:block; color: #dbe8f6; margin-bottom: 6px; font-size: 12px; }
 .drivers em { display:block; margin: 5px 0; font-size: 12px; }
 .full-report, .save { width: 100%; margin-top: 12px; height: 38px; border: 0; border-radius: 8px; color: #fff; background: linear-gradient(135deg, #674cf4, #3822a2); }
+.holdings-editor .card-title button { color: #c8f7d8; border: 1px solid rgba(67,225,132,.32); border-radius: 7px; padding: 4px 8px; background: rgba(67,225,132,.08); }
+.holding-row { display: grid; grid-template-columns: 46px 70px 1fr 1fr 54px; gap: 8px; align-items: end; padding: 10px 0; border-bottom: 1px solid rgba(75,97,123,.18); font-size: 12px; }
+.holding-row label { color: #7f94aa; text-transform: uppercase; font-size: 9px; letter-spacing: .08em; }
+.holding-row input { width: 100%; margin-top: 4px; border: 1px solid #24384f; border-radius: 6px; background: #07111d; color: #dbe8f6; padding: 6px 7px; outline: none; }
+.holding-row input:focus { border-color: #674cf4; box-shadow: 0 0 0 2px rgba(103,76,244,.18); }
+.holdings-editor > small { display: block; color: #7f94aa; margin-top: 10px; line-height: 1.35; }
 .risks h3 { margin: 14px 0 6px; color: #76eba5; text-transform: uppercase; font-size: 11px; }
 .risks h3:nth-of-type(2) { color: #ff7b8d; }
 .risks p { font-size: 12px; margin: 6px 0; color: #b9c8dc; }
@@ -164,4 +170,5 @@ h1 { font-size: 22px; line-height: 1; }
   .topbar, .mode-tabs { flex-wrap: wrap; height: auto; }
   .content-grid, .bottom-grid, .right-stack { grid-template-columns: 1fr; }
   .quote-head, .quote-stats, .heat-panel { grid-template-columns: 1fr; }
+  .holding-row { grid-template-columns: 44px 1fr; }
 }
