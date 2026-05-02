@@ -178,9 +178,24 @@ function App() {
   }, {})
   const movers = [...stocks].sort((a, b) => b.change - a.change).slice(0, 5)
   const latestCatalysts = stocks.flatMap((stock) => stock.catalysts.slice(0, 1).map((title) => ({ stock, title }))).slice(0, 3)
-  const visibleWatchlist = query ? filtered : stocks.slice(0, 12)
+  const visibleWatchlist = query ? filtered : stocks.slice(0, 16)
   const hiddenWatchlistCount = query ? 0 : Math.max(0, stocks.length - visibleWatchlist.length)
   const inPortfolio = saved.includes(selected.symbol)
+  const marketStrip = [
+    { symbol: 'S&P', value: '5,321', change: 0.71 },
+    { symbol: 'NASDAQ', value: '18,204', change: 1.04 },
+    { symbol: 'DOW', value: '39,872', change: 0.34 },
+    { symbol: 'VIX', value: '12.48', change: -4.32 },
+    { symbol: '10Y', value: '4.21%', change: -0.06 },
+    { symbol: 'DXY', value: '103.2', change: -0.18 },
+    { symbol: 'BTC', value: '91.4K', change: 2.12 },
+    { symbol: 'WTI', value: '78.20', change: 0.42 },
+    { symbol: 'GOLD', value: '2,381', change: -0.22 },
+  ]
+  const peerRows = [...stocks]
+    .filter((stock) => stock.sector === selected.sector || stock.symbol === selected.symbol)
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 8)
 
   function addTicker() {
     const raw = query.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5)
@@ -267,6 +282,10 @@ function App() {
           <div className="avatar">MC</div>
         </header>
 
+        <section className="market-strip panel">
+          {marketStrip.map((item) => <button key={item.symbol}><strong>{item.symbol}</strong><span>{item.value}</span><b className={item.change >= 0 ? 'up' : 'down'}>{item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%</b><svg viewBox="0 0 48 14"><path d="M0 10 L7 8 L13 9 L20 5 L27 7 L34 3 L41 5 L48 2" /></svg></button>)}
+        </section>
+
         <div className="content-grid">
           <section className="main-stack">
             <section className="chart-panel panel">
@@ -302,10 +321,22 @@ function App() {
               <article className="panel research-slice"><div className="card-title">Decision Frame</div><p><b className="up">Bull case:</b> {selected.opportunities[0]}</p><p><b className="down">Risk:</b> {selected.risks[0]}</p></article>
             </section>
 
+            <section className="panel peer-table">
+              <div className="card-title">Peer / Sector Comparison <button>{selected.sector}</button></div>
+              <div className="peer-head"><span>Ticker</span><span>Last</span><span>%</span><span>Cap</span><span>P/E</span><span>Rating</span><span>Trend</span></div>
+              {peerRows.map((stock) => <button key={stock.symbol} onClick={() => setSelectedSymbol(stock.symbol)} className={stock.symbol === selected.symbol ? 'active' : ''}><strong>{stock.symbol}</strong><span>${money(stock.price)}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><span>{stock.marketCap}</span><span>{stock.pe ? stock.pe.toFixed(1) : '—'}</span><span>{stock.rating || 'Watch'}</span><svg viewBox="0 0 72 20"><path d={sparkPath(stock.chart, 72, 20)} /></svg></button>)}
+            </section>
+
             <section className="bottom-grid">
               <div className="panel portfolio-card"><div className="card-title">Public Watchlist <button>No personal amounts</button></div><strong>{positions.length} tickers</strong><span className={averageChange >= 0 ? 'up' : 'down'}>{averageChange >= 0 ? '+' : ''}{averageChange.toFixed(2)}% average move · {gainers}/{positions.length} green</span><svg viewBox="0 0 280 90"><path d="M0 62 C35 20 70 84 105 46 S175 60 210 26 S250 55 280 18" /></svg><div className="mini-tabs">{['1D','1W','1M','3M','YTD','1Y','ALL'].map((x, i)=><button className={i===0?'active':''} key={x}>{x}</button>)}</div></div>
               <div className="panel allocation"><div className="card-title">Watchlist Breakdown <button>Public</button></div><div className="donut"><b>{positions.length}</b><small>Names</small></div><ul><li><i/>Technology / AI <b>Core</b></li><li><i/>Semiconductors <b>Major</b></li><li><i/>Software & Cloud <b>Major</b></li><li><i/>Personal values <b>Hidden</b></li></ul></div>
               <div className="panel movers"><div className="card-title">Today’s Top Movers</div>{movers.map((stock) => <button onClick={() => setSelectedSymbol(stock.symbol)} key={stock.symbol}><strong>{stock.symbol}</strong><svg viewBox="0 0 70 22"><path d={sparkPath(stock.chart, 70, 22)} /></svg><span>{money(stock.price)}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b></button>)}</div>
+            </section>
+
+            <section className="terminal-grid">
+              <article className="panel dense-list"><div className="card-title">Catalyst Matrix</div>{selected.catalysts.slice(0,4).map((item, index) => <p key={item}><strong>{['Now','Next','30D','Qtr'][index]}</strong><span>{item}</span><b className={index < 2 ? 'up' : ''}>{index < 2 ? 'High' : 'Med'}</b></p>)}</article>
+              <article className="panel dense-list"><div className="card-title">Risk Matrix</div>{selected.risks.slice(0,4).map((item, index) => <p key={item}><strong>R{index + 1}</strong><span>{item}</span><b className="down">Watch</b></p>)}</article>
+              <article className="panel dense-list"><div className="card-title">Opportunity Matrix</div>{selected.opportunities.slice(0,4).map((item, index) => <p key={item}><strong>O{index + 1}</strong><span>{item}</span><b className="up">Open</b></p>)}</article>
             </section>
           </section>
 
