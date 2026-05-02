@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AreaSeries, CandlestickSeries, HistogramSeries, createChart, type IChartApi, type ISeriesApi, type Time } from 'lightweight-charts'
 import './App.css'
 
 type Stock = {
@@ -28,7 +29,6 @@ type PortfolioSeed = {
 
 type DetailPanel = 'report' | 'catalysts' | 'risks' | 'watchlist' | null
 type ChartMode = 'Line' | 'Candles' | 'Volume'
-type CandleHover = { x: number; y: number; high: number; low: number; open: number; close: number; index: number } | null
 
 const fallbackStocks: Stock[] = [
   {
@@ -99,6 +99,88 @@ function movingAverage(values: number[], windowSize = 8) {
   })
 }
 
+function buildHiDpiChartData(stock: Stock, range: string) {
+  const series = expandedSeries(stock, range)
+  const config = rangeConfig[range] || rangeConfig['1D']
+  const start = new Date()
+  start.setDate(start.getDate() - config.points)
+  const rows = series.map((close, index) => {
+    const date = new Date(start)
+    date.setDate(start.getDate() + index)
+    const open = index === 0 ? close : series[index - 1]
+    const spread = Math.max(Math.abs(close - open) * 0.75, close * 0.003)
+    const high = Math.max(open, close) + spread * (0.8 + (index % 5) * 0.08)
+    const low = Math.min(open, close) - spread * (0.72 + (index % 4) * 0.07)
+    const time = date.toISOString().slice(0, 10) as Time
+    return {
+      time,
+      open: Number(open.toFixed(2)),
+      high: Number(high.toFixed(2)),
+      low: Number(low.toFixed(2)),
+      close: Number(close.toFixed(2)),
+      value: Number(close.toFixed(2)),
+      volume: Math.round(600_000 + Math.abs(close - open) * 140_000 + (index % 9) * 85_000),
+    }
+  })
+  return rows
+}
+
+function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMode: ChartMode; indicators: boolean; range: string; stock: Stock }) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const chartRef = useRef<IChartApi | null>(null)
+  const areaRef = useRef<ISeriesApi<'Area'> | null>(null)
+  const candleRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
+  const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
+  const maRef = useRef<ISeriesApi<'Area'> | null>(null)
+  const [hover, setHover] = useState<{ open: number; high: number; low: number; close: number } | null>(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const chart = createChart(containerRef.current, {
+      autoSize: true,
+      layout: { background: { color: 'transparent' }, textColor: '#8aa0bd', fontSize: 11 },
+      grid: { vertLines: { color: 'rgba(120,144,173,.08)' }, horzLines: { color: 'rgba(120,144,173,.12)' } },
+      rightPriceScale: { borderColor: 'rgba(120,144,173,.22)', scaleMargins: { top: 0.08, bottom: 0.24 } },
+      timeScale: { borderColor: 'rgba(120,144,173,.18)', timeVisible: range === '1D', secondsVisible: false },
+      crosshair: { mode: 1, vertLine: { color: 'rgba(226,239,251,.25)' }, horzLine: { color: 'rgba(226,239,251,.18)' } },
+    })
+    const area = chart.addSeries(AreaSeries, { lineColor: '#29d681', topColor: 'rgba(41,214,129,.30)', bottomColor: 'rgba(41,214,129,0)', lineWidth: 2, priceLineColor: 'rgba(41,214,129,.55)' })
+    const candles = chart.addSeries(CandlestickSeries, { upColor: '#40d982', downColor: '#f05268', borderUpColor: '#40d982', borderDownColor: '#f05268', wickUpColor: '#9af7bf', wickDownColor: '#ff9aaa' })
+    const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: '' })
+    const ma = chart.addSeries(AreaSeries, { lineColor: 'rgba(125,103,255,.95)', topColor: 'rgba(0,0,0,0)', bottomColor: 'rgba(0,0,0,0)', lineWidth: 1, priceLineVisible: false })
+    volume.priceScale().applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } })
+    chart.subscribeCrosshairMove((param) => {
+      const candle = param.seriesData.get(candles)
+      if (candle && 'open' in candle) setHover({ open: candle.open, high: candle.high, low: candle.low, close: candle.close })
+      else setHover(null)
+    })
+    chartRef.current = chart
+    areaRef.current = area
+    candleRef.current = candles
+    volumeRef.current = volume
+    maRef.current = ma
+    return () => chart.remove()
+  }, [range])
+
+  useEffect(() => {
+    const rows = buildHiDpiChartData(stock, range)
+    const areaData = rows.map((row) => ({ time: row.time, value: row.close }))
+    const volumeData = rows.map((row) => ({ time: row.time, value: row.volume, color: row.close >= row.open ? 'rgba(64,217,130,.28)' : 'rgba(240,82,104,.28)' }))
+    const maData = movingAverage(rows.map((row) => row.close), range === '1D' ? 8 : 14).map((value, index) => ({ time: rows[index].time, value }))
+    areaRef.current?.setData(areaData)
+    candleRef.current?.setData(rows)
+    volumeRef.current?.setData(volumeData)
+    maRef.current?.setData(maData)
+    areaRef.current?.applyOptions({ visible: chartMode === 'Line' })
+    candleRef.current?.applyOptions({ visible: chartMode === 'Candles' })
+    volumeRef.current?.applyOptions({ visible: chartMode === 'Candles' || chartMode === 'Volume' })
+    maRef.current?.applyOptions({ visible: indicators && chartMode !== 'Volume' })
+    chartRef.current?.timeScale().fitContent()
+  }, [chartMode, indicators, range, stock])
+
+  return <div className="hires-chart"><div className="real-chart" ref={containerRef} />{hover && chartMode === 'Candles' && <div className="ohlc-readout"><span>O <b>${money(hover.open)}</b></span><span>H <b>${money(hover.high)}</b></span><span>L <b>${money(hover.low)}</b></span><span>C <b>${money(hover.close)}</b></span></div>}</div>
+}
+
 async function fetchYahooQuote(symbol: string): Promise<Partial<Stock> | null> {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 8_000)
@@ -144,7 +226,6 @@ function App() {
   const [lastLiveUpdate, setLastLiveUpdate] = useState<string>('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [detailPanel, setDetailPanel] = useState<DetailPanel>(null)
-  const [hoveredCandle, setHoveredCandle] = useState<CandleHover>(null)
   const liveSymbolsKey = useMemo(() => stocks.map((stock) => stock.symbol).join('|'), [stocks])
 
   useEffect(() => {
@@ -259,19 +340,8 @@ function App() {
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, 8)
   const chartSeries = useMemo(() => expandedSeries(selected, range), [range, selected])
-  const chartMin = Math.min(...chartSeries)
-  const chartMax = Math.max(...chartSeries)
   const chartChange = chartSeries.length > 1 ? ((chartSeries.at(-1)! - chartSeries[0]) / chartSeries[0]) * 100 : 0
-  const chartTicks = [0, 1, 2, 3, 4].map((tick) => chartMax - ((chartMax - chartMin) * tick) / 4)
   const activeRange = rangeConfig[range] || rangeConfig['1D']
-  const maSeries = movingAverage(chartSeries, range === '1D' ? 6 : 10)
-  const candleSeries = chartSeries.slice(-42).map((close, index, arr) => {
-    const open = index === 0 ? chartSeries[Math.max(0, chartSeries.length - arr.length - 1)] || close : arr[index - 1]
-    const spread = Math.max(Math.abs(close - open) * 0.75, (chartMax - chartMin) * 0.018)
-    const high = Math.max(open, close) + spread * (0.8 + (index % 5) * 0.08)
-    const low = Math.min(open, close) - spread * (0.72 + (index % 4) * 0.07)
-    return { open, close, high, low, up: close >= open }
-  })
 
   function addTicker() {
     const raw = query.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5)
@@ -392,47 +462,8 @@ function App() {
               <div className="rangebar">{ranges.map((item) => <button className={range === item ? 'active' : ''} onClick={() => setRange(item)} key={item}>{item}</button>)}<button onClick={() => setIndicators(!indicators)} className="indicator">⌁ {indicators ? 'SMA on' : 'SMA off'}</button><button onClick={() => openPanel('report')}>⛶</button><button onClick={() => openPanel('catalysts')}>⋯</button></div>
               <div className="chart-toolbar"><div><strong>{range} performance</strong><span>{activeRange.label}</span></div><div className="chart-modes">{(['Line', 'Candles', 'Volume'] as ChartMode[]).map((mode) => <button className={chartMode === mode ? 'active' : ''} onClick={() => setChartMode(mode)} key={mode}>{mode}</button>)}</div><b className={chartChange >= 0 ? 'up' : 'down'}>{chartChange >= 0 ? '+' : ''}{chartChange.toFixed(2)}%</b></div>
               <div className="chart-wrap">
-                <svg className="big-chart" viewBox="0 0 980 360" preserveAspectRatio="none" shapeRendering="geometricPrecision" onMouseLeave={() => setHoveredCandle(null)}>
-                  <defs>
-                    <linearGradient id="chartArea" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="rgba(41,214,129,.28)"/><stop offset="100%" stopColor="rgba(41,214,129,0)"/></linearGradient>
-                  </defs>
-                  {[0,1,2,3,4].map((i) => <line key={i} x1="48" x2="925" y1={35 + i*58} y2={35 + i*58} className="grid"/>)}
-                  {[0,1,2,3,4,5].map((i) => <line key={`v-${i}`} x1={48 + i*175.4} x2={48 + i*175.4} y1="35" y2="268" className="grid vertical"/>)}
-                  {chartMode !== 'Volume' && <path className="area" d={`${sparkPath(chartSeries, 877, 230)} L877 230 L0 230 Z`} transform="translate(48 35)"/>}
-                  {chartMode !== 'Volume' && indicators && <path className="ma" d={sparkPath(maSeries, 877, 230)} transform="translate(48 35)"/>}
-                  {chartMode !== 'Volume' && <path className="line" d={sparkPath(chartSeries, 877, 230)} transform="translate(48 35)"/>}
-                  {chartMode === 'Candles' && candleSeries.map((candle, i) => {
-                    const x = 58 + i * (850 / Math.max(candleSeries.length - 1, 1))
-                    const yFor = (value: number) => 35 + (1 - ((value - chartMin) / Math.max(chartMax - chartMin, 1))) * 230
-                    const highY = yFor(candle.high)
-                    const lowY = yFor(candle.low)
-                    const openY = yFor(candle.open)
-                    const closeY = yFor(candle.close)
-                    const bodyY = Math.min(openY, closeY)
-                    const bodyHeight = Math.max(3, Math.abs(closeY - openY))
-                    return <g key={i} onMouseEnter={() => setHoveredCandle({ x, y: bodyY, index: i, high: candle.high, low: candle.low, open: candle.open, close: candle.close })}>
-                      <line x1={x} x2={x} y1={highY} y2={lowY} className={candle.up ? 'candle upc' : 'candle downc'} />
-                      <rect x={x - 5} y={bodyY} width="10" height={bodyHeight} rx="1.5" className={candle.up ? 'body upc' : 'body downc'} />
-                      <rect x={x - 10} y="35" width="20" height="230" className="hover-hit" />
-                    </g>
-                  })}
-                  {chartSeries.slice(-36).map((v, i, arr) => {
-                    const prev = arr[Math.max(i - 1, 0)]
-                    const up = v >= prev
-                    const height = 18 + Math.abs(v - prev) / Math.max(chartMax - chartMin, 1) * 68 + ((i * 7) % 22)
-                    return <rect key={`vol-${i}`} x={55 + i*24} y={328 - height} width="15" height={height} className={up ? 'greenvol' : 'redvol'} />
-                  })}
-                </svg>
-                {hoveredCandle && chartMode === 'Candles' && <div className="candle-tooltip" style={{ left: `${Math.min(78, Math.max(8, hoveredCandle.x / 9.8))}%`, top: `${Math.max(42, hoveredCandle.y + 4)}px` }}>
-                  <strong>Candle {hoveredCandle.index + 1}</strong>
-                  <span>High <b>${money(hoveredCandle.high)}</b></span>
-                  <span>Low <b>${money(hoveredCandle.low)}</b></span>
-                  <span>Open <b>${money(hoveredCandle.open)}</b></span>
-                  <span>Close <b>${money(hoveredCandle.close)}</b></span>
-                </div>}
-                <div className="price-axis">{chartTicks.map((tick) => <span key={tick}>${money(tick, tick > 100 ? 0 : 2)}</span>)}</div>
-                <div className="time-axis">{activeRange.x.map((label) => <span key={label}>{label}</span>)}</div>
-                <div className="unit-badge">USD / share · volume bars in relative millions</div>
+                <HighResolutionChart stock={selected} range={range} chartMode={chartMode} indicators={indicators} />
+                <div className="unit-badge">USD / share · high-DPI interactive chart · hover candles for O/H/L/C</div>
               </div>
             </section>
 
