@@ -112,11 +112,6 @@ function sourceLabel(source?: Stock['dataSource']) {
   return source === 'live' ? 'Live quote' : source === 'stockbot' ? 'StockBot' : 'Static'
 }
 
-function normalizeChartRows(rows: ChartRow[], stock: Stock) {
-  if (stock.dataSymbol !== '^TNX') return rows
-  return rows.map((row) => ({ ...row, open: row.open / 10, high: row.high / 10, low: row.low / 10, close: row.close / 10, value: row.value / 10 }))
-}
-
 function expandedSeries(stock: Stock, range: string) {
   const config = rangeConfig[range] || rangeConfig['1D']
   const source = stock.chart.length > 1 ? stock.chart : [stock.price * 0.98, stock.price]
@@ -197,7 +192,7 @@ async function fetchYahooHistory(symbol: string, range: string): Promise<ChartRo
       const low = Number(quote.low?.[index])
       const close = Number(quote.close?.[index])
       const volume = Number(quote.volume?.[index] || 0)
-      if (![open, high, low, close].every(Number.isFinite)) return null
+      if (![open, high, low, close].every(Number.isFinite) || close <= 0 || high <= 0 || low <= 0 || open <= 0) return null
       const date = new Date(stamp * 1000)
       const time = range === '1D'
         ? Math.floor(stamp) as Time
@@ -269,7 +264,7 @@ function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMod
       const history = await fetchYahooHistory(chartSymbol, range)
       if (cancelled) return
       if (history?.length) {
-        setRows(normalizeChartRows(history, stock))
+        setRows(history)
         setSource('live')
         return
       }
@@ -308,7 +303,7 @@ async function fetchYahooQuote(symbol: string, expectedPrice?: number): Promise<
     const result = payload?.chart?.result?.[0]
     const meta = result?.meta
     const quote = result?.indicators?.quote?.[0]
-    const closes = (quote?.close || []).filter((value: number | null) => typeof value === 'number') as number[]
+    const closes = (quote?.close || []).filter((value: number | null) => typeof value === 'number' && value > 0) as number[]
     if (!meta || !closes.length) return null
     const price = Number(meta.regularMarketPrice ?? closes.at(-1))
     const previous = Number(meta.chartPreviousClose ?? closes[0])
@@ -344,12 +339,27 @@ function App() {
   const [lastLiveUpdate, setLastLiveUpdate] = useState<string>('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [detailPanel, setDetailPanel] = useState<DetailPanel>(null)
+  const [marketSnapshots, setMarketSnapshots] = useState<Stock[]>(marketInstruments)
   const liveSymbolsKey = useMemo(() => stocks.map((stock) => stock.symbol).join('|'), [stocks])
   const stocksRef = useRef(stocks)
 
   useEffect(() => {
     stocksRef.current = stocks
   }, [stocks])
+
+  useEffect(() => {
+    let cancelled = false
+    async function refreshMarketSnapshots() {
+      const updates = await Promise.allSettled(marketInstruments.map(async (instrument) => {
+        const quote = await fetchYahooQuote(instrument.dataSymbol || instrument.symbol)
+        return quote ? { ...instrument, ...quote, symbol: instrument.symbol, dataSymbol: instrument.dataSymbol, name: instrument.name, sector: instrument.sector } : instrument
+      }))
+      if (cancelled) return
+      setMarketSnapshots(updates.map((result, index) => result.status === 'fulfilled' ? result.value : marketInstruments[index]))
+    }
+    refreshMarketSnapshots()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -425,9 +435,9 @@ function App() {
     setIsRefreshing(false)
   }
 
-  const allInstruments = useMemo(() => [...stocks, ...marketInstruments], [stocks])
+  const allInstruments = useMemo(() => [...stocks, ...marketSnapshots], [marketSnapshots, stocks])
   const selected = allInstruments.find((stock) => stock.symbol === selectedSymbol) || stocks[0]
-  const isMarketSelection = marketInstruments.some((item) => item.symbol === selected.symbol)
+  const isMarketSelection = marketSnapshots.some((item) => item.symbol === selected.symbol)
   const filtered = useMemo(() => stocks.filter((stock) => {
     const matchesQuery = `${stock.symbol} ${stock.name}`.toLowerCase().includes(query.toLowerCase())
     const matchesCategory = !categoryFilter
@@ -451,7 +461,7 @@ function App() {
   const visibleWatchlist = query || categoryFilter ? filtered : stocks
   const hiddenWatchlistCount = query || categoryFilter ? 0 : Math.max(0, stocks.length - visibleWatchlist.length)
   const inPortfolio = saved.includes(selected.symbol)
-  const marketStrip = marketInstruments.map((item) => ({
+  const marketStrip = marketSnapshots.map((item) => ({
     ...item,
     value: item.symbol === '10Y' ? `${item.price.toFixed(2)}%` : item.price >= 1000 ? item.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : money(item.price),
   }))
