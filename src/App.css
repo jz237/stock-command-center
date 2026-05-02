@@ -188,9 +188,10 @@ h1 { font-size: 18px; line-height: 1; }
 .movers button { width: 100%; display: grid; grid-template-columns: 38px 58px 1fr 48px; gap: 6px; align-items: center; border: 0; border-bottom: 1px solid rgba(75,97,123,.18); background: transparent; color: #dbe8f6; padding: 5px 0; text-align: left; font-size: 11px; }
 .movers button:nth-of-type(n+5) { display: none; }
 
-.catalyst-card article { display: grid; grid-template-columns: 38px 1fr 54px; gap: 6px; align-items: start; padding: 7px 0; border-bottom: 1px solid rgba(75,97,123,.18); }
-.catalyst-card span { color: #7f94aa; font-size: 12px; }
-.catalyst-card strong { font-size: 11px; line-height: 1.25; }
+.catalyst-card article { display: grid; grid-template-columns: 42px 1fr 74px; gap: 7px; align-items: start; padding: 8px 0; border-bottom: 1px solid rgba(75,97,123,.18); cursor: pointer; }
+.catalyst-card article:hover strong { color: #eef7ff; }
+.catalyst-card span { color: #7f94aa; font-size: 11px; text-transform: uppercase; font-weight: 800; }
+.catalyst-card strong { font-size: 11px; line-height: 1.3; color: #c8d7ea; }
 .badge { border-radius: 5px; background: rgba(67,225,132,.1); padding: 4px 6px; font-size: 10px; text-align: center; }
 .ai-card { position: relative; }
 .ai-label { float: left; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: linear-gradient(135deg,#7d67ff,#4830b6); margin-right: 10px; font-weight: 900; }
@@ -226,8 +227,10 @@ h1 { font-size: 18px; line-height: 1; }
 
 .terminal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .dense-list { border-radius: 10px; padding: 10px; }
-.dense-list p { display: grid; grid-template-columns: 36px 1fr 46px; gap: 8px; align-items: center; border-top: 1px solid rgba(75,97,123,.18); padding: 7px 0; color: #b9c8dc; font-size: 11px; }
-.dense-list p span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dense-list p, .radar-row { display: grid; grid-template-columns: 36px 1fr 72px; gap: 8px; align-items: center; border: 0; border-top: 1px solid rgba(75,97,123,.18); background: transparent; width: 100%; text-align: left; padding: 7px 0; color: #b9c8dc; font-size: 11px; }
+.dense-list p span, .radar-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radar-row { cursor: pointer; }
+.radar-row:hover { color: #eef7ff; background: rgba(67,225,132,.04); }
 
 .detail-drawer { margin-top: 8px; border-radius: 12px; padding: 14px; }
 .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid rgba(75,97,123,.2); padding-bottom: 12px; margin-bottom: 12px; }
