@@ -101,6 +101,7 @@ function App() {
   const [saved, setSaved] = useState<string[]>(() => JSON.parse(localStorage.getItem('savedPortfolioSymbols') || '[]'))
   const [liveStatus, setLiveStatus] = useState<'loading' | 'live' | 'static'>('loading')
   const [lastLiveUpdate, setLastLiveUpdate] = useState<string>('')
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const liveSymbolsKey = useMemo(() => stocks.map((stock) => stock.symbol).join('|'), [stocks])
 
   useEffect(() => {
@@ -144,6 +145,26 @@ function App() {
       window.clearInterval(interval)
     }
   }, [liveSymbolsKey])
+
+  async function refreshPricesNow() {
+    const symbols = liveSymbolsKey.split('|').filter(Boolean)
+    if (!symbols.length || isRefreshing) return
+    setIsRefreshing(true)
+    setLiveStatus('loading')
+    const updates = await Promise.allSettled(symbols.map((symbol) => fetchYahooQuote(symbol)))
+    const updateMap = new Map<string, Partial<Stock>>()
+    updates.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value) updateMap.set(symbols[index], result.value)
+    })
+    if (updateMap.size) {
+      setStocks((current) => current.map((stock) => updateMap.has(stock.symbol) ? { ...stock, ...updateMap.get(stock.symbol) } : stock))
+      setLiveStatus('live')
+      setLastLiveUpdate(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+    } else {
+      setLiveStatus('static')
+    }
+    setIsRefreshing(false)
+  }
 
   const selected = stocks.find((stock) => stock.symbol === selectedSymbol) || stocks[0]
   const filtered = useMemo(() => stocks.filter((stock) => `${stock.symbol} ${stock.name}`.toLowerCase().includes(query.toLowerCase())), [query, stocks])
@@ -238,7 +259,7 @@ function App() {
       <section className="workspace">
         <header className="topbar">
           <label className="global-search"><span>⌕</span><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTicker()} placeholder="Search company or ticker…" /></label>
-          <div className={`live-chip ${liveStatus}`}><i />{liveStatus === 'live' ? `Live prices ${lastLiveUpdate}` : liveStatus === 'loading' ? 'Connecting live prices' : 'Static fallback data'}</div>
+          <div className={`live-chip ${liveStatus}`}><i />{liveStatus === 'live' ? `Live prices ${lastLiveUpdate}` : liveStatus === 'loading' ? 'Connecting live prices' : 'Static fallback data'}<button onClick={refreshPricesNow} disabled={isRefreshing}>{isRefreshing ? 'Refreshing…' : 'Update prices'}</button></div>
           <div className="mode-tabs">{(['Research', 'News', 'Portfolio'] as const).map((tab) => <button className={view === tab ? 'selected' : ''} onClick={() => setView(tab)} key={tab}>▣ {tab}</button>)}</div>
           <div className="avatar">MC</div>
         </header>
@@ -270,6 +291,12 @@ function App() {
 
             <section className="heat-panel panel">
               {Object.entries(grouped).map(([group, items]) => <div className="heat-sector" key={group}><span>{group}</span><div>{items.slice(0, 8).map((stock) => <button onClick={() => setSelectedSymbol(stock.symbol)} className={stock.change >= 0 ? 'gain' : 'loss'} style={{ '--weight': Math.max(6, Math.min(24, Math.abs(stock.price) / 20 + stock.confidence / 8)) } as React.CSSProperties} key={stock.symbol}><strong>{stock.symbol}</strong><em>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</em><small>{stock.marketCap}</small></button>)}</div></div>)}
+            </section>
+
+            <section className="research-deck">
+              <article className="panel research-slice"><div className="card-title">Research Breakdown</div><strong>{selected.confidence}/100 conviction</strong><p>{selected.thesis}</p></article>
+              <article className="panel research-slice"><div className="card-title">Catalysts to Watch</div>{selected.catalysts.slice(0,4).map((item) => <button className="mini-catalyst" key={item}>{item}</button>)}</article>
+              <article className="panel research-slice"><div className="card-title">Decision Frame</div><p><b className="up">Bull case:</b> {selected.opportunities[0]}</p><p><b className="down">Risk:</b> {selected.risks[0]}</p></article>
             </section>
 
             <section className="bottom-grid">
