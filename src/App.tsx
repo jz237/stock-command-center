@@ -20,7 +20,7 @@ type Stock = {
   catalysts: string[]
   chart: number[]
   volume?: number
-  dataSource?: 'static' | 'live'
+  dataSource?: 'static' | 'live' | 'stockbot'
 }
 
 type PortfolioSeed = {
@@ -83,6 +83,20 @@ function sparkPath(values: number[], width = 96, height = 34) {
 
 function money(value: number, digits = 2) {
   return value.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })
+}
+
+function compactMoney(value?: number | null) {
+  return Number.isFinite(Number(value)) ? `$${money(Number(value))}` : '—'
+}
+
+function targetUpside(stock: Stock) {
+  if (!stock.targetPrice || !stock.price) return '—'
+  const upside = ((stock.targetPrice - stock.price) / stock.price) * 100
+  return `${upside >= 0 ? '+' : ''}${upside.toFixed(1)}%`
+}
+
+function sourceLabel(source?: Stock['dataSource']) {
+  return source === 'live' ? 'Live quote' : source === 'stockbot' ? 'StockBot' : 'Static'
 }
 
 function expandedSeries(stock: Stock, range: string) {
@@ -549,6 +563,7 @@ function App() {
                 <button onClick={toggleSave} className="star">★</button>
                 <div className="quote-stats">
                   <span>Market Cap <b>{selected.marketCap}</b></span><span>P/E <b>{selected.pe ? selected.pe.toFixed(2) : '—'}</b></span><span>Rating <b>{selected.rating || 'Watch'}</b></span><span>Volume <b>{selected.volume || '—'}M</b></span><span>52W Range <b>{selected.range52w?.[0] && selected.range52w?.[1] ? `${selected.range52w[0]} - ${selected.range52w[1]}` : '—'}</b></span>
+                  <span>Target <b>{compactMoney(selected.targetPrice)}</b></span><span>Target Gap <b className={selected.targetPrice && selected.targetPrice >= selected.price ? 'up' : 'down'}>{targetUpside(selected)}</b></span><span>Conviction <b>{selected.confidence}/100</b></span><span>Sector <b>{selected.sector}</b></span><span>Source <b>{sourceLabel(selected.dataSource)}</b></span>
                 </div>
               </div>
               <div className="rangebar">{ranges.map((item) => <button className={range === item ? 'active' : ''} onClick={() => setRange(item)} key={item}>{item}</button>)}<button onClick={() => setIndicators(!indicators)} className="indicator">⌁ {indicators ? 'SMA on' : 'SMA off'}</button><button onClick={() => openPanel('report')}>⛶</button><button onClick={() => openPanel('catalysts')}>⋯</button></div>
