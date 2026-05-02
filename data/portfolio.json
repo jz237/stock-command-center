@@ -1,58 +1,9 @@
 {
+  "cash": 18420,
   "positions": [
-    {
-      "symbol": "ARM"
-    },
-    {
-      "symbol": "AVGO"
-    },
-    {
-      "symbol": "CRWV"
-    },
-    {
-      "symbol": "GOOG"
-    },
-    {
-      "symbol": "INTC"
-    },
-    {
-      "symbol": "META"
-    },
-    {
-      "symbol": "MSFT"
-    },
-    {
-      "symbol": "NVDA"
-    },
-    {
-      "symbol": "QCOM"
-    },
-    {
-      "symbol": "VRT"
-    },
-    {
-      "symbol": "AMZN"
-    },
-    {
-      "symbol": "TSM"
-    },
-    {
-      "symbol": "PLTR"
-    },
-    {
-      "symbol": "NVTS"
-    },
-    {
-      "symbol": "ORCL"
-    },
-    {
-      "symbol": "SOUN"
-    },
-    {
-      "symbol": "BA"
-    },
-    {
-      "symbol": "AAPL"
-    }
+    { "symbol": "NVDA", "shares": 18, "avgCost": 742 },
+    { "symbol": "MSFT", "shares": 24, "avgCost": 318 },
+    { "symbol": "AVGO", "shares": 8, "avgCost": 936 },
+    { "symbol": "TSM", "shares": 40, "avgCost": 112 }
   ]
 }

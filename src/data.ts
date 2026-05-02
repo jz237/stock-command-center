@@ -52,7 +52,13 @@ export const fallbackStocks: Stock[] = [
 ]
 
 export const fallbackPortfolio: PortfolioSeed = {
-  positions: ['NVDA', 'MSFT', 'AVGO', 'TSM', 'PLTR', 'ARM', 'GOOG', 'META', 'AMZN', 'INTC', 'QCOM', 'VRT', 'CRWV', 'NVTS', 'ORCL', 'SOUN', 'BA', 'AAPL'].map((symbol) => ({ symbol })),
+  cash: 18420,
+  positions: [
+    { symbol: 'NVDA', shares: 18, avgCost: 742 },
+    { symbol: 'MSFT', shares: 24, avgCost: 318 },
+    { symbol: 'AVGO', shares: 8, avgCost: 936 },
+    { symbol: 'TSM', shares: 40, avgCost: 112 },
+  ],
 }
 
 export const news = [
