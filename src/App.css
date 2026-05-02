@@ -158,6 +158,8 @@ h1 { font-size: 18px; line-height: 1; }
 .research-slice { border-radius: 10px; padding: 9px; min-height: 92px; max-height: 98px; overflow: hidden; }
 .research-slice strong { display:block; margin: 8px 0 5px; font-size: 17px; }
 .research-slice p { color: #b9c8dc; font-size: 11px; line-height: 1.35; margin-top: 5px; }
+.readout-slice { cursor: pointer; transition: border-color .12s ease, transform .12s ease; }
+.readout-slice:hover { border-color: rgba(67,225,132,.32); transform: translateY(-1px); }
 .mini-catalyst { display: block; width: 100%; margin-top: 5px; text-align: left; border: 1px solid rgba(75,97,123,.22); border-radius: 7px; background: rgba(255,255,255,.025); color: #dbe8f6; padding: 5px 7px; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .peer-table { border-radius: 10px; padding: 10px; }
@@ -200,6 +202,7 @@ h1 { font-size: 18px; line-height: 1; }
 .workbench-row span { color: #7f94aa; font-size: 10px; text-transform: uppercase; font-weight: 900; letter-spacing: .06em; }
 .workbench-row strong { font-size: 12px; line-height: 1.35; }
 .workbench-row b { font-size: 10px; text-align: right; }
+.readout-workbench .workbench-row { grid-template-columns: 76px 1fr 118px; }
 .badge { border-radius: 5px; background: rgba(67,225,132,.1); padding: 4px 6px; font-size: 10px; text-align: center; }
 .ai-card { position: relative; }
 .ai-label { float: left; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: linear-gradient(135deg,#7d67ff,#4830b6); margin-right: 10px; font-weight: 900; }

@@ -28,7 +28,7 @@ type PortfolioSeed = {
   positions: { symbol: string }[]
 }
 
-type DetailPanel = 'report' | 'catalysts' | 'risks' | 'watchlist' | null
+type DetailPanel = 'report' | 'research' | 'catalysts' | 'risks' | 'watchlist' | null
 type ChartMode = 'Line' | 'Candles' | 'Volume'
 type ChartRow = { time: Time; open: number; high: number; low: number; close: number; value: number; volume: number }
 type HistoryPayload = { updatedAt: string; source?: string; stocks: Record<string, Record<string, ChartRow[]>> }
@@ -110,6 +110,26 @@ function targetUpside(stock: Stock) {
 
 function sourceLabel(source?: Stock['dataSource']) {
   return source === 'live' ? 'Live quote' : source === 'stockbot' ? 'StockBot' : 'Static'
+}
+
+function setupLabel(stock: Stock) {
+  if (stock.sector === 'Volatility') return stock.change > 0 ? 'Stress rising' : 'Stress easing'
+  if (stock.sector === 'Rates') return stock.change > 0 ? 'Rate pressure' : 'Rate relief'
+  if (stock.sector === 'Currency') return stock.change > 0 ? 'Dollar tightening' : 'Dollar easing'
+  if (stock.confidence >= 84 && stock.change >= 0) return 'Bullish momentum'
+  if (stock.confidence >= 72) return 'Constructive setup'
+  if (stock.change < -2) return 'Caution / reset'
+  return 'Needs confirmation'
+}
+
+function actionPosture(stock: Stock) {
+  if (stock.sector === 'Volatility') return stock.change > 0 ? 'Respect risk-off signals' : 'Risk appetite improving'
+  if (stock.sector === 'Rates') return stock.change > 0 ? 'Watch growth-stock pressure' : 'Rate backdrop supportive'
+  if (stock.sector === 'Currency') return stock.change > 0 ? 'Dollar strength may tighten liquidity' : 'Dollar relief can help risk assets'
+  if (stock.confidence >= 84 && stock.change >= 1) return 'Momentum active'
+  if (stock.confidence >= 74) return 'Watch pullbacks'
+  if (stock.change < -2) return 'Wait for stabilization'
+  return 'Monitor for catalyst confirmation'
 }
 
 function expandedSeries(stock: Stock, range: string) {
@@ -379,7 +399,7 @@ function App() {
   useEffect(() => {
     function syncPanelFromHash() {
       const panel = window.location.hash.replace('#', '')
-      if (panel === 'report' || panel === 'catalysts' || panel === 'risks' || panel === 'watchlist') setDetailPanel(panel)
+      if (panel === 'report' || panel === 'research' || panel === 'catalysts' || panel === 'risks' || panel === 'watchlist') setDetailPanel(panel)
     }
     syncPanelFromHash()
     window.addEventListener('hashchange', syncPanelFromHash)
@@ -469,6 +489,13 @@ function App() {
     ...selected.catalysts.map((text, index) => ({ label: index === 0 ? 'Primary' : `C${index + 1}`, type: index === 0 ? 'Main catalyst' : 'Watch item', text, tone: index < 2 ? 'up' : 'neutral' })),
     ...selected.opportunities.slice(0, 4).map((text, index) => ({ label: `Bull ${index + 1}`, type: 'Upside trigger', text, tone: 'up' })),
     ...selected.risks.slice(0, 4).map((text, index) => ({ label: `Risk ${index + 1}`, type: 'Downside trigger', text, tone: 'down' })),
+  ]
+  const investmentReadout = [
+    { label: 'Setup', value: setupLabel(selected), text: `${selected.symbol} is currently a ${setupLabel(selected).toLowerCase()} story based on conviction, recent move, and instrument type.`, tone: selected.change >= 0 ? 'up' : 'down' },
+    { label: 'Why it matters', value: 'Thesis', text: selected.thesis, tone: 'neutral' },
+    { label: 'Confirms it', value: 'Bull case', text: selected.opportunities[0] || selected.catalysts[0] || 'Needs a clear confirming catalyst.', tone: 'up' },
+    { label: 'Breaks it', value: 'Risk case', text: selected.risks[0] || 'No explicit break point recorded yet.', tone: 'down' },
+    { label: 'Posture', value: actionPosture(selected), text: actionPosture(selected), tone: selected.change >= 0 ? 'up' : 'neutral' },
   ]
   const visibleWatchlist = query || categoryFilter ? filtered : stocks
   const hiddenWatchlistCount = query || categoryFilter ? 0 : Math.max(0, stocks.length - visibleWatchlist.length)
@@ -620,7 +647,7 @@ function App() {
             </section>
 
             <section className="research-deck">
-              <article className="panel research-slice"><div className="card-title">Research Breakdown</div><strong>{selected.confidence}/100 conviction</strong><p>{selected.thesis}</p></article>
+              <article className="panel research-slice readout-slice" onClick={() => openPanel('research')}><div className="card-title">Investment Readout <button>{selected.symbol}</button></div><strong>{setupLabel(selected)}</strong><p>{actionPosture(selected)} · {selected.thesis}</p></article>
               <article className="panel research-slice"><div className="card-title">Catalysts to Watch</div>{selected.catalysts.slice(0,4).map((item) => <button onClick={() => openPanel('catalysts')} className="mini-catalyst" key={item}>{item}</button>)}</article>
               <article className="panel research-slice"><div className="card-title">Decision Frame</div><p><b className="up">Bull case:</b> {selected.opportunities[0]}</p><p><b className="down">Risk:</b> {selected.risks[0]}</p></article>
             </section>
@@ -644,8 +671,8 @@ function App() {
             </section>
           </section>
 
-          <aside className={`right-stack ${detailPanel === 'catalysts' ? 'catalyst-mode' : ''}`}>
-            {detailPanel === 'catalysts' ? <section className="panel catalyst-workbench"><div className="card-title">{selected.symbol} Catalyst Workbench <button onClick={closePanel}>Collapse</button></div><p className="workbench-note">Click any item to open a live news search for that catalyst.</p>{catalystWorkbench.map((item) => <button className="workbench-row" onClick={() => openCatalystArticle(item.text)} key={`${item.label}-${item.text}`}><span>{item.label}</span><strong>{item.text}</strong><b className={item.tone}>{item.type}</b></button>)}</section> : <>
+          <aside className={`right-stack ${detailPanel === 'catalysts' || detailPanel === 'research' ? 'catalyst-mode' : ''}`}>
+            {detailPanel === 'research' ? <section className="panel catalyst-workbench readout-workbench"><div className="card-title">{selected.symbol} Investment Readout <button onClick={closePanel}>Collapse</button></div><p className="workbench-note">Plain-English decision frame for the selected stock or market instrument.</p>{investmentReadout.map((item) => <button className="workbench-row" onClick={() => openPanel('report')} key={`${item.label}-${item.text}`}><span>{item.label}</span><strong>{item.text}</strong><b className={item.tone}>{item.value}</b></button>)}</section> : detailPanel === 'catalysts' ? <section className="panel catalyst-workbench"><div className="card-title">{selected.symbol} Catalyst Workbench <button onClick={closePanel}>Collapse</button></div><p className="workbench-note">Click any item to open a live news search for that catalyst.</p>{catalystWorkbench.map((item) => <button className="workbench-row" onClick={() => openCatalystArticle(item.text)} key={`${item.label}-${item.text}`}><span>{item.label}</span><strong>{item.text}</strong><b className={item.tone}>{item.type}</b></button>)}</section> : <>
             <section className="panel catalyst-card"><div className="card-title">Catalyst Radar <button onClick={() => openPanel('catalysts')}>{selected.symbol}</button></div>{catalystRadar.map((item) => <article key={`${selected.symbol}-${item.label}`} onClick={() => openPanel('catalysts')}><span>{item.label}</span><strong>{item.text}</strong><b className={`${item.tone} badge`}>{item.type}</b></article>)}</section>
             <section className="panel ai-card"><div className="ai-label">AI</div><div className="card-title">AI Research Summary</div><h2>{selected.symbol} <small>{selected.name}</small></h2><b className="rating">⌁ {selected.confidence > 82 ? 'Strong Bullish' : selected.confidence > 68 ? 'Constructive' : 'Watch Carefully'}</b><p>{view === 'News' ? selected.catalysts.join(' · ') : view === 'Portfolio' ? `${selected.symbol} portfolio exposure can be tracked here. Save it, monitor catalysts, and compare it against the rest of the watchlist.` : selected.thesis}</p><div className="drivers"><span>Key Drivers</span>{selected.opportunities.slice(0,4).map((item) => <em key={item}>● {item}</em>)}</div><button onClick={() => openPanel('report')} className="full-report">View Full Research Report ›</button></section>
             {view === 'Portfolio' && <section className="panel holdings-editor"><div className="card-title">Public Tracker <button onClick={addSelectedHolding}>Track {selected.symbol}</button></div>{positions.map((position) => <div className="holding-row public" key={position.symbol}><strong>{position.symbol}</strong><span>{position.stock ? `$${money(position.stock.price)}` : 'No quote'}</span><b className={position.stock && position.stock.change >= 0 ? 'up' : 'down'}>{position.stock ? `${position.stock.change >= 0 ? '+' : ''}${position.stock.change.toFixed(2)}%` : '—'}</b></div>)}<small>Only ticker symbols and market performance are stored here. Cash, share counts, cost basis, and personal portfolio values are intentionally not included.</small></section>}
@@ -655,8 +682,9 @@ function App() {
           </aside>
         </div>
         {detailPanel && <section className="detail-drawer panel">
-          <div className="drawer-head"><div><span className="eyebrow">Command detail</span><h2>{detailPanel === 'report' ? `${selected.symbol} Full Research Report` : detailPanel === 'catalysts' ? `${selected.symbol} Catalyst Radar` : detailPanel === 'risks' ? 'Risks & Opportunities' : 'Tracked StockBot Watchlist'}</h2></div><button onClick={closePanel}>Close ×</button></div>
+          <div className="drawer-head"><div><span className="eyebrow">Command detail</span><h2>{detailPanel === 'report' ? `${selected.symbol} Full Research Report` : detailPanel === 'research' ? `${selected.symbol} Investment Readout` : detailPanel === 'catalysts' ? `${selected.symbol} Catalyst Radar` : detailPanel === 'risks' ? 'Risks & Opportunities' : 'Tracked StockBot Watchlist'}</h2></div><button onClick={closePanel}>Close ×</button></div>
           {detailPanel === 'report' && <div className="drawer-grid report-view"><article><h3>Thesis</h3><p>{selected.thesis}</p><dl><dt>Conviction</dt><dd>{selected.confidence}/100</dd><dt>Sector</dt><dd>{selected.sector}</dd><dt>Market cap</dt><dd>{selected.marketCap}</dd><dt>Rating</dt><dd>{selected.rating || 'Watch'}</dd><dt>Target</dt><dd>{selected.targetPrice ? `$${money(selected.targetPrice)}` : '—'}</dd></dl></article><article><h3>Catalysts</h3>{selected.catalysts.map((item) => <p key={item}>● {item}</p>)}<h3>Key drivers</h3>{selected.opportunities.map((item) => <p className="good" key={item}>+ {item}</p>)}</article><article><h3>Risk checklist</h3>{selected.risks.map((item) => <p className="bad" key={item}>− {item}</p>)}<button onClick={() => setView('Portfolio')} className="drawer-action">Track in public watchlist</button></article></div>}
+          {detailPanel === 'research' && <div className="drawer-grid report-view"><article><h3>Readout</h3>{investmentReadout.map((item) => <p key={item.label} className={item.tone === 'down' ? 'bad' : item.tone === 'up' ? 'good' : ''}><b>{item.label}:</b> {item.text}</p>)}</article><article><h3>Confirming evidence</h3>{selected.opportunities.map((item) => <p className="good" key={item}>+ {item}</p>)}</article><article><h3>Break points</h3>{selected.risks.map((item) => <p className="bad" key={item}>− {item}</p>)}</article></div>}
           {detailPanel === 'catalysts' && <div className="drawer-grid report-view"><article><h3>What could move {selected.symbol}</h3>{catalystRadar.map((item) => <p key={item.label} className={item.tone === 'down' ? 'bad' : 'good'}><b>{item.label}:</b> {item.text}</p>)}</article><article><h3>Bull triggers</h3>{selected.opportunities.map((item) => <p className="good" key={item}>+ {item}</p>)}</article><article><h3>Risk triggers</h3>{selected.risks.map((item) => <p className="bad" key={item}>− {item}</p>)}</article></div>}
           {detailPanel === 'risks' && <div className="drawer-grid"><article><h3>Risks</h3>{selected.risks.map((item) => <p className="bad" key={item}>● {item}</p>)}</article><article><h3>Opportunities</h3>{selected.opportunities.map((item) => <p className="good" key={item}>● {item}</p>)}</article><article><h3>Decision frame</h3><p>Use this panel as the quick checklist for whether news changes the story. If a catalyst validates an opportunity, the stock deserves attention. If a risk moves from theoretical to active, it belongs on the watch list.</p></article></div>}
           {detailPanel === 'watchlist' && <div className="drawer-table watchlist-table">{filtered.map((stock) => <button key={stock.symbol} onClick={() => { setSelectedSymbol(stock.symbol); setDetailPanel('report') }}><strong>{stock.symbol}</strong><span>{stock.name}</span><span>${money(stock.price)}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><small>{stock.sector}</small></button>)}</div>}
