@@ -1,7 +1,9 @@
 import { ChartPanel } from '../components/ChartPanel'
 import type { PageProps } from './pageTypes'
 
-export function DashboardPage({ equity, heatmap, onSelectStock, pnl, pnlPercent, portfolio, quoteSource, selected, topExposure }: PageProps) {
+export function DashboardPage({ heatmap, onSelectStock, positions, quoteSource, selected, stocks, topExposure }: PageProps) {
+  const averageChange = stocks.length ? stocks.reduce((sum, stock) => sum + stock.change, 0) / stocks.length : 0
+  const gainers = stocks.filter((stock) => stock.change >= 0).length
   return (
     <>
       <ChartPanel stock={selected} quoteSource={quoteSource} />
@@ -16,9 +18,9 @@ export function DashboardPage({ equity, heatmap, onSelectStock, pnl, pnlPercent,
         </div>
       </section>
       <section className="bottom-grid">
-        <div className="panel metric"><span>Portfolio value</span><strong>${(equity + portfolio.cash).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong><small>Cash ${portfolio.cash.toLocaleString()}</small></div>
-        <div className="panel metric"><span>Open gain/loss</span><strong className={pnl >= 0 ? 'up' : 'down'}>{pnl >= 0 ? '+' : ''}${pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong><small>{pnlPercent.toFixed(1)}% on tracked positions</small></div>
-        <div className="panel metric"><span>Top exposure</span><strong>{topExposure?.symbol}</strong><small>{topExposure ? `${topExposure.shares} shares · ${topExposure.stock.sector}` : 'Based on seed portfolio JSON'}</small></div>
+        <div className="panel metric"><span>Tracked names</span><strong>{positions.length}</strong><small>Public ticker list only</small></div>
+        <div className="panel metric"><span>Average move</span><strong className={averageChange >= 0 ? 'up' : 'down'}>{averageChange >= 0 ? '+' : ''}{averageChange.toFixed(2)}%</strong><small>{gainers}/{stocks.length} green today</small></div>
+        <div className="panel metric"><span>Strongest tracked name</span><strong>{topExposure?.symbol}</strong><small>{topExposure ? topExposure.stock.sector : 'Based on public watchlist JSON'}</small></div>
       </section>
     </>
   )
