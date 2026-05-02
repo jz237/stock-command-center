@@ -452,10 +452,13 @@ function App() {
   const averageChange = positions.length ? positions.reduce((sum, position) => sum + (position.stock?.change || 0), 0) / positions.length : 0
   const gainers = positions.filter((position) => (position.stock?.change || 0) >= 0).length
   const grouped = stocks.reduce<Record<string, Stock[]>>((acc, stock) => {
-    const key = stock.sector.includes('Semi') ? 'Semiconductors' : stock.sector.includes('Cloud') || stock.sector.includes('Software') ? 'Software' : stock.sector.includes('Consumer') ? 'Consumer Electronics' : stock.sector.includes('Communication') ? 'Communication Services' : stock.sector
+    const key = stock.sector.includes('Semi') ? 'Semiconductors' : stock.sector.includes('Cloud') || stock.sector.includes('Software') ? 'Software' : stock.sector.includes('Consumer') ? 'Consumer Electronics' : stock.sector.includes('Communication') ? 'Consumer / Internet' : stock.sector.includes('Industrial') ? 'Industrials' : stock.sector
     acc[key] = [...(acc[key] || []), stock]
     return acc
   }, {})
+  const sectorBoard = ['Semiconductors', 'Software', 'Consumer / Internet', 'Consumer Electronics', 'Industrials']
+    .map((group) => ({ group, items: grouped[group] || [] }))
+    .filter(({ items }) => items.length)
   const movers = [...stocks].sort((a, b) => b.change - a.change).slice(0, 5)
   const latestCatalysts = stocks.flatMap((stock) => stock.catalysts.slice(0, 1).map((title) => ({ stock, title }))).slice(0, 3)
   const visibleWatchlist = query || categoryFilter ? filtered : stocks
@@ -599,7 +602,7 @@ function App() {
             </section>
 
             <section className="heat-panel panel">
-              {Object.entries(grouped).map(([group, items]) => <div className="heat-sector" key={group}><span>{group}</span><div>{items.slice(0, 8).map((stock) => <button onClick={() => setSelectedSymbol(stock.symbol)} className={stock.change >= 0 ? 'gain' : 'loss'} style={{ '--weight': Math.max(6, Math.min(24, Math.abs(stock.price) / 20 + stock.confidence / 8)) } as React.CSSProperties} key={stock.symbol}><strong>{stock.symbol}</strong><em>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</em><small>{stock.marketCap}</small></button>)}</div></div>)}
+              {sectorBoard.map(({ group, items }) => <div className="heat-sector" key={group}><span>{group}<b>{items.length}</b></span><div>{items.slice(0, 8).map((stock) => <button onClick={() => setSelectedSymbol(stock.symbol)} className={stock.change >= 0 ? 'gain' : 'loss'} key={stock.symbol}><strong>{stock.symbol}</strong><em>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</em><small>{stock.marketCap}</small></button>)}</div></div>)}
             </section>
 
             <section className="research-deck">

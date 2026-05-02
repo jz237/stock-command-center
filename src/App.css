@@ -141,16 +141,18 @@ h1 { font-size: 18px; line-height: 1; }
 .chart-source { position: absolute; right: 12px; bottom: 10px; z-index: 4; border: 1px solid rgba(75,97,123,.22); border-radius: 999px; background: rgba(5,15,28,.72); color: #8fa6c0; padding: 5px 8px; font-size: 10px; pointer-events: none; }
 .chart-source.live { color: #adf5c9; border-color: rgba(67,225,132,.30); }
 
-.heat-panel { min-height: 245px; border-radius: 10px; display: grid; grid-template-columns: 1.1fr .9fr .9fr; gap: 1px; overflow: hidden; background: #142033; }
-.heat-sector { background: #07111d; min-height: 120px; display: flex; flex-direction: column; }
-.heat-sector > span { height: 22px; padding: 5px 8px; color: #a8b9ce; background: #0b1724; text-transform: uppercase; font-size: 10px; font-weight: 800; }
-.heat-sector > div { flex: 1; display: flex; flex-wrap: wrap; gap: 1px; }
-.heat-sector button { flex: var(--weight) 1 72px; min-height: 48px; border: 0; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
-.heat-sector strong { font-size: clamp(14px, 1.45vw, 24px); line-height: 1; }
-.heat-sector em { font-size: 12px; }
-.heat-sector small { opacity: .82; }
-.gain { background: linear-gradient(135deg, #10a85b, #07562f); }
-.loss { background: linear-gradient(135deg, #b63737, #5e191c); }
+.heat-panel { min-height: 245px; border-radius: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; overflow: hidden; background: transparent; }
+.heat-sector { background: linear-gradient(180deg, rgba(11,23,36,.96), rgba(7,17,29,.96)); border: 1px solid rgba(75,97,123,.22); border-radius: 10px; min-height: 116px; display: flex; flex-direction: column; overflow: hidden; }
+.heat-sector > span { min-height: 30px; padding: 8px 10px; color: #d7e5f5; background: rgba(15,30,47,.9); text-transform: uppercase; font-size: 10px; font-weight: 900; letter-spacing: .08em; display: flex; justify-content: space-between; align-items: center; }
+.heat-sector > span b { color: #7f94aa; font-size: 10px; }
+.heat-sector > div { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 8px; }
+.heat-sector button { min-height: 46px; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: #eef7ff; display: grid; place-items: center; align-content: center; gap: 2px; text-shadow: none; transition: transform .12s ease, border-color .12s ease, filter .12s ease; }
+.heat-sector button:hover { transform: translateY(-1px); border-color: rgba(226,239,251,.22); filter: brightness(1.08); }
+.heat-sector strong { font-size: 15px; line-height: 1; letter-spacing: .04em; }
+.heat-sector em { font-size: 11px; font-style: normal; font-weight: 800; }
+.heat-sector small { color: rgba(238,247,255,.72); font-size: 9px; font-weight: 700; }
+.gain { background: linear-gradient(135deg, rgba(28,154,92,.95), rgba(9,75,44,.96)); }
+.loss { background: linear-gradient(135deg, rgba(177,56,62,.95), rgba(87,22,27,.96)); }
 
 .research-deck { display: grid; grid-template-columns: 1.1fr .9fr .9fr; gap: 8px; }
 .research-slice { border-radius: 10px; padding: 9px; min-height: 92px; max-height: 98px; overflow: hidden; }
