@@ -658,7 +658,7 @@ function App() {
 
             <section className="research-deck">
               <article className="panel research-slice readout-slice" onClick={() => openPanel('research')}><div className="card-title">Investment Readout <button>{selected.symbol}</button></div><strong>{setupLabel(selected)}</strong><p>{actionPosture(selected)} · {selected.thesis}</p></article>
-              <article className="panel research-slice"><div className="card-title">Catalysts to Watch</div>{selected.catalysts.slice(0,4).map((item) => <button onClick={() => openCatalysts(item)} className="mini-catalyst" key={item}>{item}</button>)}</article>
+              <article className="panel research-slice catalyst-slice" onClick={() => openCatalysts()}><div className="card-title">Catalysts to Watch</div>{selected.catalysts.slice(0,4).map((item) => <button onClick={(event) => { event.stopPropagation(); openCatalysts(item) }} className="mini-catalyst" key={item}>{item}</button>)}</article>
               <article className="panel research-slice"><div className="card-title">Decision Frame</div><p><b className="up">Bull case:</b> {selected.opportunities[0]}</p><p><b className="down">Risk:</b> {selected.risks[0]}</p></article>
             </section>
 
