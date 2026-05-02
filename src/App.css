@@ -132,6 +132,8 @@ h1 { font-size: 18px; line-height: 1; }
 .unit-badge { position: absolute; left: 12px; top: 10px; border: 1px solid rgba(75,97,123,.22); border-radius: 999px; color: #8fa6c0; background: rgba(5,15,28,.72); padding: 5px 8px; font-size: 10px; pointer-events: none; }
 .ohlc-readout { position: absolute; right: 12px; top: 10px; z-index: 4; display: flex; gap: 8px; border: 1px solid rgba(226,239,251,.16); border-radius: 999px; background: rgba(4,12,22,.88); color: #8ea3bc; padding: 6px 9px; font-size: 10px; pointer-events: none; }
 .ohlc-readout b { color: #eef7ff; }
+.chart-source { position: absolute; right: 12px; bottom: 10px; z-index: 4; border: 1px solid rgba(75,97,123,.22); border-radius: 999px; background: rgba(5,15,28,.72); color: #8fa6c0; padding: 5px 8px; font-size: 10px; pointer-events: none; }
+.chart-source.live { color: #adf5c9; border-color: rgba(67,225,132,.30); }
 
 .heat-panel { min-height: 245px; border-radius: 10px; display: grid; grid-template-columns: 1.1fr .9fr .9fr; gap: 1px; overflow: hidden; background: #142033; }
 .heat-sector { background: #07111d; min-height: 120px; display: flex; flex-direction: column; }

@@ -29,6 +29,8 @@ type PortfolioSeed = {
 
 type DetailPanel = 'report' | 'catalysts' | 'risks' | 'watchlist' | null
 type ChartMode = 'Line' | 'Candles' | 'Volume'
+type ChartRow = { time: Time; open: number; high: number; low: number; close: number; value: number; volume: number }
+type HistoryPayload = { updatedAt: string; source?: string; stocks: Record<string, Record<string, ChartRow[]>> }
 
 const fallbackStocks: Stock[] = [
   {
@@ -125,6 +127,51 @@ function buildHiDpiChartData(stock: Stock, range: string) {
   return rows
 }
 
+const yahooRangeMap: Record<string, { range: string; interval: string }> = {
+  '1D': { range: '1d', interval: '5m' },
+  '5D': { range: '5d', interval: '30m' },
+  '1M': { range: '1mo', interval: '1d' },
+  '3M': { range: '3mo', interval: '1d' },
+  '6M': { range: '6mo', interval: '1d' },
+  YTD: { range: 'ytd', interval: '1d' },
+  '1Y': { range: '1y', interval: '1d' },
+  '5Y': { range: '5y', interval: '1wk' },
+  MAX: { range: 'max', interval: '1mo' },
+}
+
+async function fetchYahooHistory(symbol: string, range: string): Promise<ChartRow[] | null> {
+  const config = yahooRangeMap[range] || yahooRangeMap['1D']
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 10_000)
+  try {
+    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${config.range}&interval=${config.interval}`, { signal: controller.signal })
+    if (!response.ok) return null
+    const payload = await response.json()
+    const result = payload?.chart?.result?.[0]
+    const timestamps = result?.timestamp as number[] | undefined
+    const quote = result?.indicators?.quote?.[0]
+    if (!timestamps?.length || !quote) return null
+    const rows = timestamps.map((stamp, index) => {
+      const open = Number(quote.open?.[index])
+      const high = Number(quote.high?.[index])
+      const low = Number(quote.low?.[index])
+      const close = Number(quote.close?.[index])
+      const volume = Number(quote.volume?.[index] || 0)
+      if (![open, high, low, close].every(Number.isFinite)) return null
+      const date = new Date(stamp * 1000)
+      const time = range === '1D'
+        ? Math.floor(stamp) as Time
+        : date.toISOString().slice(0, 10) as Time
+      return { time, open: Number(open.toFixed(2)), high: Number(high.toFixed(2)), low: Number(low.toFixed(2)), close: Number(close.toFixed(2)), value: Number(close.toFixed(2)), volume }
+    }).filter(Boolean) as ChartRow[]
+    return rows.length > 1 ? rows : null
+  } catch {
+    return null
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
 function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMode: ChartMode; indicators: boolean; range: string; stock: Stock }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -133,6 +180,9 @@ function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMod
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const maRef = useRef<ISeriesApi<'Area'> | null>(null)
   const [hover, setHover] = useState<{ open: number; high: number; low: number; close: number } | null>(null)
+  const [rows, setRows] = useState<ChartRow[]>(() => buildHiDpiChartData(stock, range))
+  const [source, setSource] = useState<'cached' | 'live' | 'fallback'>('fallback')
+  const historyRef = useRef<HistoryPayload | null>(null)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -163,7 +213,33 @@ function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMod
   }, [range])
 
   useEffect(() => {
-    const rows = buildHiDpiChartData(stock, range)
+    let cancelled = false
+    async function loadHistory() {
+      if (!historyRef.current) {
+        historyRef.current = await fetch(`${import.meta.env.BASE_URL}data/history.json`).then((r) => r.json()).catch(() => null)
+      }
+      const cached = historyRef.current?.stocks?.[stock.symbol]?.[range]
+      if (cancelled) return
+      if (cached?.length) {
+        setRows(cached.map((row) => ({ ...row, value: row.close })))
+        setSource('cached')
+        return
+      }
+      const history = await fetchYahooHistory(stock.symbol, range)
+      if (cancelled) return
+      if (history?.length) {
+        setRows(history)
+        setSource('live')
+        return
+      }
+      setRows(buildHiDpiChartData(stock, range))
+      setSource('fallback')
+    }
+    loadHistory()
+    return () => { cancelled = true }
+  }, [range, stock])
+
+  useEffect(() => {
     const areaData = rows.map((row) => ({ time: row.time, value: row.close }))
     const volumeData = rows.map((row) => ({ time: row.time, value: row.volume, color: row.close >= row.open ? 'rgba(64,217,130,.28)' : 'rgba(240,82,104,.28)' }))
     const maData = movingAverage(rows.map((row) => row.close), range === '1D' ? 8 : 14).map((value, index) => ({ time: rows[index].time, value }))
@@ -176,9 +252,9 @@ function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMod
     volumeRef.current?.applyOptions({ visible: chartMode === 'Candles' || chartMode === 'Volume' })
     maRef.current?.applyOptions({ visible: indicators && chartMode !== 'Volume' })
     chartRef.current?.timeScale().fitContent()
-  }, [chartMode, indicators, range, stock])
+  }, [chartMode, indicators, range, rows])
 
-  return <div className="hires-chart"><div className="real-chart" ref={containerRef} />{hover && chartMode === 'Candles' && <div className="ohlc-readout"><span>O <b>${money(hover.open)}</b></span><span>H <b>${money(hover.high)}</b></span><span>L <b>${money(hover.low)}</b></span><span>C <b>${money(hover.close)}</b></span></div>}</div>
+  return <div className="hires-chart"><div className="real-chart" ref={containerRef} />{hover && chartMode === 'Candles' && <div className="ohlc-readout"><span>O <b>${money(hover.open)}</b></span><span>H <b>${money(hover.high)}</b></span><span>L <b>${money(hover.low)}</b></span><span>C <b>${money(hover.close)}</b></span></div>}<div className={`chart-source ${source}`}>{source === 'cached' ? 'StockBot cached history' : source === 'live' ? 'Yahoo live history' : 'Fallback history'}</div></div>
 }
 
 async function fetchYahooQuote(symbol: string): Promise<Partial<Stock> | null> {
