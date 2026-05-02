@@ -17,8 +17,7 @@ export type Stock = {
 }
 
 export type PortfolioSeed = {
-  cash: number
-  positions: { symbol: string; shares: number; avgCost: number }[]
+  positions: { symbol: string }[]
 }
 
 export type PositionWithStock = PortfolioSeed['positions'][number] & { stock: Stock }

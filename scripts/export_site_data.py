@@ -131,14 +131,7 @@ def main():
         })
 
     portfolio_payload = {
-        "cash": 18420,
-        "positions": [
-            {"symbol": "NVDA", "shares": 18, "avgCost": 742},
-            {"symbol": "MSFT", "shares": 24, "avgCost": 318},
-            {"symbol": "AVGO", "shares": 8, "avgCost": 936},
-            {"symbol": "TSM", "shares": 40, "avgCost": 112},
-            {"symbol": "PLTR", "shares": 65, "avgCost": 31},
-        ],
+        "positions": [{"symbol": item["symbol"]} for item in portfolio.get("tickers", [])],
     }
     for directory in (PUBLIC, DIST):
         directory.mkdir(parents=True, exist_ok=True)

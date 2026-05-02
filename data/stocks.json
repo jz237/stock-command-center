@@ -60,7 +60,7 @@
     "volume": 126.1,
     "changeAmount": 0.86,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "AVGO",
@@ -128,7 +128,7 @@
     "volume": 76.9,
     "changeAmount": 3.85,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "CRWV",
@@ -193,7 +193,7 @@
     "volume": 144.9,
     "changeAmount": 7.41,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "GOOG",
@@ -258,7 +258,7 @@
     "volume": 72.6,
     "changeAmount": 1.28,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "INTC",
@@ -327,7 +327,7 @@
     "volume": 92.2,
     "changeAmount": 5.14,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "META",
@@ -396,7 +396,7 @@
     "volume": 88.6,
     "changeAmount": -3.16,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "MSFT",
@@ -463,7 +463,7 @@
     "volume": 52.4,
     "changeAmount": 6.66,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "NVDA",
@@ -531,7 +531,7 @@
     "volume": 84.3,
     "changeAmount": -1.12,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "QCOM",
@@ -593,7 +593,7 @@
     "volume": 19.2,
     "changeAmount": -2.57,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "VRT",
@@ -650,7 +650,7 @@
     "volume": 42.8,
     "changeAmount": -0.18,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "AMZN",
@@ -713,7 +713,7 @@
     "volume": 57.9,
     "changeAmount": 3.2,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "TSM",
@@ -775,7 +775,7 @@
     "volume": 30.2,
     "changeAmount": 1.61,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "PLTR",
@@ -838,7 +838,7 @@
     "volume": 49.5,
     "changeAmount": 4.96,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "NVTS",
@@ -887,7 +887,7 @@
     "volume": 92.3,
     "changeAmount": 0.95,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "ORCL",
@@ -951,7 +951,7 @@
     "volume": 43.9,
     "changeAmount": 10.44,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "SOUN",
@@ -1002,7 +1002,7 @@
     "volume": 56,
     "changeAmount": 1.6,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "BA",
@@ -1063,7 +1063,7 @@
     "volume": 43.5,
     "changeAmount": -1.65,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   },
   {
     "symbol": "AAPL",
@@ -1121,6 +1121,6 @@
     "volume": 41.5,
     "changeAmount": 8.79,
     "quoteSource": "stockprices.dev",
-    "quoteUpdatedAt": "2026-05-02T17:35:58.268Z"
+    "quoteUpdatedAt": "2026-05-02T17:40:50.509Z"
   }
 ]

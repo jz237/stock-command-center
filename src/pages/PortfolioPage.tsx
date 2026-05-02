@@ -1,27 +1,26 @@
 import type { PageProps } from './pageTypes'
 
-export function PortfolioPage({ equity, onSelectStock, pnl, pnlPercent, portfolio, positions }: PageProps) {
+export function PortfolioPage({ onSelectStock, positions, stocks }: PageProps) {
+  const averageChange = stocks.length ? stocks.reduce((sum, stock) => sum + stock.change, 0) / stocks.length : 0
+  const gainers = stocks.filter((stock) => stock.change >= 0).length
+
   return (
     <>
       <section className="bottom-grid">
-        <div className="panel metric"><span>Total value</span><strong>${(equity + portfolio.cash).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong><small>Portfolio plus cash</small></div>
-        <div className="panel metric"><span>Invested equity</span><strong>${equity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong><small>Seed portfolio positions</small></div>
-        <div className="panel metric"><span>Unrealized P/L</span><strong className={pnl >= 0 ? 'up' : 'down'}>{pnl >= 0 ? '+' : ''}${pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong><small>{pnlPercent.toFixed(1)}%</small></div>
+        <div className="panel metric"><span>Tracked tickers</span><strong>{positions.length}</strong><small>Public symbols only</small></div>
+        <div className="panel metric"><span>Average daily move</span><strong className={averageChange >= 0 ? 'up' : 'down'}>{averageChange >= 0 ? '+' : ''}{averageChange.toFixed(2)}%</strong><small>{gainers}/{stocks.length} names green</small></div>
+        <div className="panel metric"><span>Privacy posture</span><strong>Clean</strong><small>No cash, shares, cost basis, or account value</small></div>
       </section>
       <section className="panel holdings">
-        <div className="section-title">Holdings</div>
-        {positions.map((position) => {
-          const value = position.stock.price * position.shares
-          const gain = value - position.avgCost * position.shares
-          return (
-            <button key={position.symbol} onClick={() => onSelectStock(position.symbol)} className="holding-row">
-              <span><strong>{position.symbol}</strong><small>{position.stock.name}</small></span>
-              <span>{position.shares} shares</span>
-              <span>${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-              <b className={gain >= 0 ? 'up' : 'down'}>{gain >= 0 ? '+' : ''}${gain.toLocaleString(undefined, { maximumFractionDigits: 0 })}</b>
-            </button>
-          )
-        })}
+        <div className="section-title">Public stock tracker</div>
+        {positions.map((position) => (
+          <button key={position.symbol} onClick={() => onSelectStock(position.symbol)} className="holding-row public">
+            <span><strong>{position.symbol}</strong><small>{position.stock.name}</small></span>
+            <span>{position.stock.sector}</span>
+            <span>${position.stock.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+            <b className={position.stock.change >= 0 ? 'up' : 'down'}>{position.stock.change >= 0 ? '+' : ''}{position.stock.change.toFixed(2)}%</b>
+          </button>
+        ))}
       </section>
     </>
   )

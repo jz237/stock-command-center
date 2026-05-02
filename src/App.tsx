@@ -23,8 +23,7 @@ type Stock = {
 }
 
 type PortfolioSeed = {
-  cash: number
-  positions: { symbol: string; shares: number; avgCost: number }[]
+  positions: { symbol: string }[]
 }
 
 const fallbackStocks: Stock[] = [
@@ -39,13 +38,7 @@ const fallbackStocks: Stock[] = [
 ]
 
 const fallbackPortfolio: PortfolioSeed = {
-  cash: 18420,
-  positions: [
-    { symbol: 'NVDA', shares: 18, avgCost: 742 },
-    { symbol: 'MSFT', shares: 24, avgCost: 318 },
-    { symbol: 'AVGO', shares: 8, avgCost: 936 },
-    { symbol: 'TSM', shares: 40, avgCost: 112 },
-  ],
+  positions: ['NVDA', 'MSFT', 'AVGO', 'TSM', 'PLTR', 'ARM', 'GOOG', 'META', 'AMZN', 'INTC', 'QCOM', 'VRT', 'CRWV', 'NVTS', 'ORCL', 'SOUN', 'BA', 'AAPL'].map((symbol) => ({ symbol })),
 }
 
 const ranges = ['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', '5Y', 'MAX']
@@ -65,12 +58,6 @@ function sparkPath(values: number[], width = 96, height = 34) {
 
 function money(value: number, digits = 2) {
   return value.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })
-}
-
-function compact(value: number) {
-  if (Math.abs(value) > 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`
-  if (Math.abs(value) > 1_000) return `$${(value / 1_000).toFixed(1)}K`
-  return `$${money(value, 0)}`
 }
 
 async function fetchYahooQuote(symbol: string): Promise<Partial<Stock> | null> {
@@ -161,10 +148,8 @@ function App() {
   const selected = stocks.find((stock) => stock.symbol === selectedSymbol) || stocks[0]
   const filtered = useMemo(() => stocks.filter((stock) => `${stock.symbol} ${stock.name}`.toLowerCase().includes(query.toLowerCase())), [query, stocks])
   const positions = portfolio.positions.map((position) => ({ ...position, stock: stocks.find((stock) => stock.symbol === position.symbol) })).filter((p) => p.stock)
-  const equity = positions.reduce((sum, position) => sum + (position.stock?.price || 0) * position.shares, 0)
-  const cost = positions.reduce((sum, position) => sum + position.avgCost * position.shares, 0)
-  const pnl = equity - cost
-  const dayChange = positions.reduce((sum, position) => sum + ((position.stock?.price || 0) * position.shares * ((position.stock?.change || 0) / 100)), 0)
+  const averageChange = positions.length ? positions.reduce((sum, position) => sum + (position.stock?.change || 0), 0) / positions.length : 0
+  const gainers = positions.filter((position) => (position.stock?.change || 0) >= 0).length
   const grouped = stocks.reduce<Record<string, Stock[]>>((acc, stock) => {
     const key = stock.sector.includes('Semi') ? 'Semiconductors' : stock.sector.includes('Cloud') || stock.sector.includes('Software') ? 'Software' : stock.sector.includes('Consumer') ? 'Consumer Electronics' : stock.sector.includes('Communication') ? 'Communication Services' : stock.sector
     acc[key] = [...(acc[key] || []), stock]
@@ -173,7 +158,6 @@ function App() {
   const movers = [...stocks].sort((a, b) => b.change - a.change).slice(0, 5)
   const latestCatalysts = stocks.flatMap((stock) => stock.catalysts.slice(0, 1).map((title) => ({ stock, title }))).slice(0, 4)
   const inPortfolio = saved.includes(selected.symbol)
-  const holdingRows = portfolio.positions.map((position) => ({ ...position, stock: stocks.find((stock) => stock.symbol === position.symbol) }))
 
   function addTicker() {
     const raw = query.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5)
@@ -213,22 +197,11 @@ function App() {
     localStorage.setItem('savedPortfolioSymbols', JSON.stringify(next))
   }
 
-  function persistPortfolio(next: PortfolioSeed) {
-    setPortfolio(next)
-    localStorage.setItem('commandCenterPortfolio', JSON.stringify(next))
-  }
-
-  function updateHolding(symbol: string, field: 'shares' | 'avgCost', rawValue: string) {
-    const value = Math.max(0, Number(rawValue) || 0)
-    persistPortfolio({
-      ...portfolio,
-      positions: portfolio.positions.map((position) => position.symbol === symbol ? { ...position, [field]: value } : position),
-    })
-  }
-
   function addSelectedHolding() {
     if (portfolio.positions.some((position) => position.symbol === selected.symbol)) return
-    persistPortfolio({ ...portfolio, positions: [...portfolio.positions, { symbol: selected.symbol, shares: 1, avgCost: selected.price }] })
+    const next = { ...portfolio, positions: [...portfolio.positions, { symbol: selected.symbol }] }
+    setPortfolio(next)
+    localStorage.setItem('commandCenterPortfolio', JSON.stringify(next))
   }
 
   return (
@@ -300,8 +273,8 @@ function App() {
             </section>
 
             <section className="bottom-grid">
-              <div className="panel portfolio-card"><div className="card-title">Portfolio Overview <button>My Portfolio ⌄</button></div><strong>{compact(equity + portfolio.cash)}</strong><span className={dayChange >= 0 ? 'up' : 'down'}>{dayChange >= 0 ? '+' : ''}{compact(dayChange)} today · {pnl >= 0 ? '+' : ''}{compact(pnl)} total</span><svg viewBox="0 0 280 90"><path d="M0 62 C35 20 70 84 105 46 S175 60 210 26 S250 55 280 18" /></svg><div className="mini-tabs">{['1D','1W','1M','3M','YTD','1Y','ALL'].map((x, i)=><button className={i===0?'active':''} key={x}>{x}</button>)}</div></div>
-              <div className="panel allocation"><div className="card-title">Performance Breakdown <button>Allocation ⌄</button></div><div className="donut"><b>{compact(equity)}</b><small>Total</small></div><ul><li><i/>Technology <b>58.6%</b></li><li><i/>Communication <b>16.8%</b></li><li><i/>Consumer Cyclical <b>12.4%</b></li><li><i/>Cash <b>5.5%</b></li></ul></div>
+              <div className="panel portfolio-card"><div className="card-title">Public Watchlist <button>No personal amounts</button></div><strong>{positions.length} tickers</strong><span className={averageChange >= 0 ? 'up' : 'down'}>{averageChange >= 0 ? '+' : ''}{averageChange.toFixed(2)}% average move · {gainers}/{positions.length} green</span><svg viewBox="0 0 280 90"><path d="M0 62 C35 20 70 84 105 46 S175 60 210 26 S250 55 280 18" /></svg><div className="mini-tabs">{['1D','1W','1M','3M','YTD','1Y','ALL'].map((x, i)=><button className={i===0?'active':''} key={x}>{x}</button>)}</div></div>
+              <div className="panel allocation"><div className="card-title">Watchlist Breakdown <button>Public</button></div><div className="donut"><b>{positions.length}</b><small>Names</small></div><ul><li><i/>Technology / AI <b>Core</b></li><li><i/>Semiconductors <b>Major</b></li><li><i/>Software & Cloud <b>Major</b></li><li><i/>Personal values <b>Hidden</b></li></ul></div>
               <div className="panel movers"><div className="card-title">Today’s Top Movers</div>{movers.map((stock) => <button onClick={() => setSelectedSymbol(stock.symbol)} key={stock.symbol}><strong>{stock.symbol}</strong><svg viewBox="0 0 70 22"><path d={sparkPath(stock.chart, 70, 22)} /></svg><span>{money(stock.price)}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b></button>)}</div>
             </section>
           </section>
@@ -309,7 +282,7 @@ function App() {
           <aside className="right-stack">
             <section className="panel catalyst-card"><div className="card-title">Latest Catalysts <button>View all</button></div>{latestCatalysts.map(({ stock, title }, index) => <article key={`${stock.symbol}-${title}`}><span>{[2,4,4,7][index]}h ago</span><strong>{title}</strong><b className={stock.change >= 0 ? 'up badge' : 'down badge'}>{stock.change >= 0 ? 'Bullish' : 'Watch'}</b></article>)}</section>
             <section className="panel ai-card"><div className="ai-label">AI</div><div className="card-title">AI Research Summary</div><h2>{selected.symbol} <small>{selected.name}</small></h2><b className="rating">⌁ {selected.confidence > 82 ? 'Strong Bullish' : selected.confidence > 68 ? 'Constructive' : 'Watch Carefully'}</b><p>{view === 'News' ? selected.catalysts.join(' · ') : view === 'Portfolio' ? `${selected.symbol} portfolio exposure can be tracked here. Save it, monitor catalysts, and compare it against the rest of the watchlist.` : selected.thesis}</p><div className="drivers"><span>Key Drivers</span>{selected.opportunities.slice(0,4).map((item) => <em key={item}>● {item}</em>)}</div><button className="full-report">View Full Research Report ›</button></section>
-            {view === 'Portfolio' && <section className="panel holdings-editor"><div className="card-title">Holdings Editor <button onClick={addSelectedHolding}>Add {selected.symbol}</button></div>{holdingRows.map((position) => <div className="holding-row" key={position.symbol}><strong>{position.symbol}</strong><span>{position.stock ? `$${money(position.stock.price)}` : 'No quote'}</span><label>Shares<input value={position.shares} onChange={(event) => updateHolding(position.symbol, 'shares', event.target.value)} inputMode="decimal" /></label><label>Avg Cost<input value={position.avgCost} onChange={(event) => updateHolding(position.symbol, 'avgCost', event.target.value)} inputMode="decimal" /></label><b className={position.stock && position.stock.price >= position.avgCost ? 'up' : 'down'}>{position.stock ? compact((position.stock.price - position.avgCost) * position.shares) : '—'}</b></div>)}<small>Saved in this browser. Static JSON stays untouched until we wire authenticated account storage.</small></section>}
+            {view === 'Portfolio' && <section className="panel holdings-editor"><div className="card-title">Public Tracker <button onClick={addSelectedHolding}>Track {selected.symbol}</button></div>{positions.map((position) => <div className="holding-row public" key={position.symbol}><strong>{position.symbol}</strong><span>{position.stock ? `$${money(position.stock.price)}` : 'No quote'}</span><b className={position.stock && position.stock.change >= 0 ? 'up' : 'down'}>{position.stock ? `${position.stock.change >= 0 ? '+' : ''}${position.stock.change.toFixed(2)}%` : '—'}</b></div>)}<small>Only ticker symbols and market performance are stored here. Cash, share counts, cost basis, and personal portfolio values are intentionally not included.</small></section>}
             <section className="panel risks"><div className="card-title">Risks & Opportunities <button>View all</button></div><h3>Opportunities</h3>{selected.opportunities.slice(0,3).map((item) => <p className="good" key={item}>● {item}</p>)}<h3>Risks</h3>{selected.risks.slice(0,3).map((item) => <p className="bad" key={item}>● {item}</p>)}<button onClick={toggleSave} className="save">★ {inPortfolio ? 'Saved to Portfolio' : 'Save to Portfolio'}</button></section>
             <section className="panel market-summary"><div className="card-title">Market Summary</div><strong>S&P 500<br/>5,321.41</strong><span className="up">+0.71%</span><svg viewBox="0 0 230 72"><path d="M0 54 L18 50 L32 53 L45 43 L62 44 L78 34 L96 38 L113 30 L130 28 L147 35 L162 22 L178 26 L194 18 L213 20 L230 15" /></svg><div className="breadth"><span>Advancing <b>382</b></span><span>Declining <b>118</b></span><span>Unchanged <b>22</b></span></div><div className="bar"><i/><i/><i/></div></section>
           </aside>
