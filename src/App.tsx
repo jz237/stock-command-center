@@ -27,6 +27,7 @@ type PortfolioSeed = {
 }
 
 type DetailPanel = 'report' | 'catalysts' | 'risks' | 'watchlist' | null
+type ChartMode = 'Line' | 'Candles' | 'Volume'
 
 const fallbackStocks: Stock[] = [
   {
@@ -44,6 +45,17 @@ const fallbackPortfolio: PortfolioSeed = {
 }
 
 const ranges = ['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', '5Y', 'MAX']
+const rangeConfig: Record<string, { points: number; label: string; x: string[]; drift: number; volatility: number }> = {
+  '1D': { points: 48, label: 'Intraday · 5 minute bars', x: ['9:30', '11:00', '12:30', '2:00', '4:00'], drift: 0.004, volatility: 0.35 },
+  '5D': { points: 55, label: '5 trading days · hourly bars', x: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], drift: 0.012, volatility: 0.55 },
+  '1M': { points: 64, label: '1 month · daily closes', x: ['Week 1', 'Week 2', 'Week 3', 'Week 4'], drift: 0.028, volatility: 0.85 },
+  '3M': { points: 78, label: '3 months · daily closes', x: ['Month 1', 'Month 2', 'Month 3'], drift: 0.055, volatility: 1.1 },
+  '6M': { points: 96, label: '6 months · daily closes', x: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], drift: 0.09, volatility: 1.35 },
+  YTD: { points: 110, label: 'Year to date · daily closes', x: ['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Now'], drift: 0.12, volatility: 1.5 },
+  '1Y': { points: 126, label: '1 year · daily closes', x: ['Q1', 'Q2', 'Q3', 'Q4', 'Now'], drift: 0.18, volatility: 1.8 },
+  '5Y': { points: 150, label: '5 years · weekly closes', x: ['2022', '2023', '2024', '2025', '2026'], drift: 0.52, volatility: 2.4 },
+  MAX: { points: 170, label: 'Max history · monthly closes', x: ['IPO', 'Early', 'Mid', 'Recent', 'Now'], drift: 0.9, volatility: 3.1 },
+}
 const categories = ['AI & Semiconductors', 'Cloud & Software', 'Consumer Tech', 'Watchlist', 'Long Term Holds']
 const nav = ['▦', '▧', '▤', '▭', '⚙']
 const LIVE_REFRESH_MS = 120_000
@@ -60,6 +72,30 @@ function sparkPath(values: number[], width = 96, height = 34) {
 
 function money(value: number, digits = 2) {
   return value.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })
+}
+
+function expandedSeries(stock: Stock, range: string) {
+  const config = rangeConfig[range] || rangeConfig['1D']
+  const source = stock.chart.length > 1 ? stock.chart : [stock.price * 0.98, stock.price]
+  const last = stock.price || source.at(-1) || 1
+  const sourceLast = source.at(-1) || last
+  return Array.from({ length: config.points }, (_, index) => {
+    const t = index / Math.max(config.points - 1, 1)
+    const sourceIndex = Math.min(source.length - 1, Math.round(t * (source.length - 1)))
+    const sourceMove = ((source[sourceIndex] || sourceLast) - sourceLast) / Math.max(sourceLast, 1)
+    const wave = Math.sin(index * 0.72 + stock.symbol.charCodeAt(0)) * 0.006 + Math.cos(index * 0.19 + stock.symbol.length) * 0.004
+    const historicalDiscount = config.drift * (1 - t) * (stock.confidence >= 70 ? 1 : 0.55)
+    const value = last * (1 + sourceMove * config.volatility + wave - historicalDiscount)
+    return Number((index === config.points - 1 ? last : Math.max(value, last * 0.12)).toFixed(2))
+  })
+}
+
+function movingAverage(values: number[], windowSize = 8) {
+  return values.map((_, index) => {
+    const start = Math.max(0, index - windowSize + 1)
+    const slice = values.slice(start, index + 1)
+    return slice.reduce((sum, value) => sum + value, 0) / slice.length
+  })
 }
 
 async function fetchYahooQuote(symbol: string): Promise<Partial<Stock> | null> {
@@ -99,6 +135,7 @@ function App() {
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [range, setRange] = useState('1D')
+  const [chartMode, setChartMode] = useState<ChartMode>('Candles')
   const [view, setView] = useState<'Research' | 'News' | 'Portfolio'>('Research')
   const [indicators, setIndicators] = useState(true)
   const [saved, setSaved] = useState<string[]>(() => JSON.parse(localStorage.getItem('savedPortfolioSymbols') || '[]'))
@@ -219,6 +256,13 @@ function App() {
     .filter((stock) => stock.sector === selected.sector || stock.symbol === selected.symbol)
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, 8)
+  const chartSeries = useMemo(() => expandedSeries(selected, range), [range, selected])
+  const chartMin = Math.min(...chartSeries)
+  const chartMax = Math.max(...chartSeries)
+  const chartChange = chartSeries.length > 1 ? ((chartSeries.at(-1)! - chartSeries[0]) / chartSeries[0]) * 100 : 0
+  const chartTicks = [0, 1, 2, 3, 4].map((tick) => chartMax - ((chartMax - chartMin) * tick) / 4)
+  const activeRange = rangeConfig[range] || rangeConfig['1D']
+  const maSeries = movingAverage(chartSeries, range === '1D' ? 6 : 10)
 
   function addTicker() {
     const raw = query.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5)
@@ -336,19 +380,32 @@ function App() {
                   <span>Market Cap <b>{selected.marketCap}</b></span><span>P/E <b>{selected.pe ? selected.pe.toFixed(2) : '—'}</b></span><span>Rating <b>{selected.rating || 'Watch'}</b></span><span>Volume <b>{selected.volume || '—'}M</b></span><span>52W Range <b>{selected.range52w?.[0] && selected.range52w?.[1] ? `${selected.range52w[0]} - ${selected.range52w[1]}` : '—'}</b></span>
                 </div>
               </div>
-              <div className="rangebar">{ranges.map((item) => <button className={range === item ? 'active' : ''} onClick={() => setRange(item)} key={item}>{item}</button>)}<button onClick={() => setIndicators(!indicators)} className="indicator">⌁ Indicators</button><button onClick={() => openPanel('report')}>⛶</button><button onClick={() => openPanel('catalysts')}>⋯</button></div>
-              <svg className="big-chart" viewBox="0 0 900 330" preserveAspectRatio="none">
-                {[0,1,2,3,4,5].map((i) => <line key={i} x1="0" x2="900" y1={35 + i*48} y2={35 + i*48} className="grid"/>)}
-                {indicators && <path className="ma" d={sparkPath(selected.chart.map((v, i) => v * (0.985 + Math.sin(i) * .002)), 900, 210)} transform="translate(0 48)"/>}
-                <path className="line" d={sparkPath(selected.chart, 900, 210)} transform="translate(0 48)"/>
-                {selected.chart.slice(-18).map((v, i, arr) => {
-                  const prev = arr[Math.max(i - 1, 0)]
-                  const up = v >= prev
-                  const h = 28 + Math.abs(v - prev) * 1.3
-                  return <g key={i} transform={`translate(${i * 50 + 18}, ${245 - (v % 58)})`}><line y1={-18} y2={h} className={up ? 'candle upc' : 'candle downc'} /><rect x="-8" y="0" width="16" height={Math.max(12, h / 2)} rx="2" className={up ? 'body upc' : 'body downc'} /></g>
-                })}
-                {selected.chart.slice(-22).map((v, i) => <rect key={`vol-${i}`} x={i*41+8} y={292 - (v % 34)} width="23" height={24 + (v % 34)} className={i % 3 === 0 ? 'redvol' : 'greenvol'} />)}
-              </svg>
+              <div className="rangebar">{ranges.map((item) => <button className={range === item ? 'active' : ''} onClick={() => setRange(item)} key={item}>{item}</button>)}<button onClick={() => setIndicators(!indicators)} className="indicator">⌁ {indicators ? 'SMA on' : 'SMA off'}</button><button onClick={() => openPanel('report')}>⛶</button><button onClick={() => openPanel('catalysts')}>⋯</button></div>
+              <div className="chart-toolbar"><div><strong>{range} performance</strong><span>{activeRange.label}</span></div><div className="chart-modes">{(['Line', 'Candles', 'Volume'] as ChartMode[]).map((mode) => <button className={chartMode === mode ? 'active' : ''} onClick={() => setChartMode(mode)} key={mode}>{mode}</button>)}</div><b className={chartChange >= 0 ? 'up' : 'down'}>{chartChange >= 0 ? '+' : ''}{chartChange.toFixed(2)}%</b></div>
+              <div className="chart-wrap">
+                <svg className="big-chart" viewBox="0 0 980 360" preserveAspectRatio="none">
+                  {[0,1,2,3,4].map((i) => <line key={i} x1="48" x2="925" y1={35 + i*58} y2={35 + i*58} className="grid"/>)}
+                  {[0,1,2,3,4,5].map((i) => <line key={`v-${i}`} x1={48 + i*175.4} x2={48 + i*175.4} y1="35" y2="268" className="grid vertical"/>)}
+                  {chartMode !== 'Volume' && indicators && <path className="ma" d={sparkPath(maSeries, 877, 230)} transform="translate(48 35)"/>}
+                  {chartMode !== 'Volume' && <path className="line" d={sparkPath(chartSeries, 877, 230)} transform="translate(48 35)"/>}
+                  {chartMode === 'Candles' && chartSeries.slice(-34).map((v, i, arr) => {
+                    const prev = arr[Math.max(i - 1, 0)]
+                    const up = v >= prev
+                    const body = Math.max(8, Math.min(44, Math.abs(v - prev) / Math.max(chartMax - chartMin, 1) * 110 + 8))
+                    const y = 35 + (1 - ((v - chartMin) / Math.max(chartMax - chartMin, 1))) * 230
+                    return <g key={i} transform={`translate(${60 + i * 25.5}, ${y})`}><line y1={-18} y2={body + 18} className={up ? 'candle upc' : 'candle downc'} /><rect x="-6" y="0" width="12" height={body} rx="2" className={up ? 'body upc' : 'body downc'} /></g>
+                  })}
+                  {chartSeries.slice(-36).map((v, i, arr) => {
+                    const prev = arr[Math.max(i - 1, 0)]
+                    const up = v >= prev
+                    const height = 18 + Math.abs(v - prev) / Math.max(chartMax - chartMin, 1) * 68 + ((i * 7) % 22)
+                    return <rect key={`vol-${i}`} x={55 + i*24} y={328 - height} width="15" height={height} className={up ? 'greenvol' : 'redvol'} />
+                  })}
+                </svg>
+                <div className="price-axis">{chartTicks.map((tick) => <span key={tick}>${money(tick, tick > 100 ? 0 : 2)}</span>)}</div>
+                <div className="time-axis">{activeRange.x.map((label) => <span key={label}>{label}</span>)}</div>
+                <div className="unit-badge">USD / share · volume bars in relative millions</div>
+              </div>
             </section>
 
             <section className="heat-panel panel">

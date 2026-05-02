@@ -102,8 +102,16 @@ h1 { font-size: 18px; line-height: 1; }
 .rangebar button { height: 23px; border: 0; border-radius: 5px; color: #91a8c2; background: transparent; padding: 0 7px; font-size: 10px; }
 .rangebar .active, .rangebar button:hover { background: rgba(120,93,252,.35); color: #fff; }
 .rangebar .indicator { margin-left: auto; border: 1px solid #26384d; background: #0b1724; }
-.big-chart { width: 100%; height: 275px; background: linear-gradient(180deg, rgba(9,32,35,.9), rgba(5,15,28,.94)); }
+.chart-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 11px 0; }
+.chart-toolbar strong { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #e5f2ff; }
+.chart-toolbar span { display: block; color: #7890aa; font-size: 10px; margin-top: 2px; }
+.chart-modes { display: flex; gap: 5px; margin-left: auto; }
+.chart-modes button { border: 1px solid #26384d; border-radius: 999px; background: #0b1724; color: #91a8c2; padding: 5px 9px; font-size: 10px; }
+.chart-modes button.active, .chart-modes button:hover { border-color: rgba(67,225,132,.45); background: rgba(67,225,132,.09); color: #ddffeb; }
+.chart-wrap { position: relative; height: 304px; margin-top: 3px; background: linear-gradient(180deg, rgba(9,32,35,.9), rgba(5,15,28,.94)); border-top: 1px solid rgba(75,97,123,.12); }
+.big-chart { width: 100%; height: 100%; }
 .grid { stroke: rgba(92,114,140,.18); stroke-width: 1; }
+.grid.vertical { stroke: rgba(92,114,140,.1); }
 .line { fill: none; stroke: #29d681; stroke-width: 3.5; filter: drop-shadow(0 0 10px rgba(41,214,129,.5)); }
 .ma { fill: none; stroke: rgba(125,103,255,.9); stroke-width: 2; stroke-dasharray: 6 6; }
 .candle { stroke-width: 2; }
@@ -111,6 +119,9 @@ h1 { font-size: 18px; line-height: 1; }
 .body.downc, .downc { fill: #f05268; stroke: #f05268; }
 .greenvol { fill: rgba(64,217,130,.32); }
 .redvol { fill: rgba(240,82,104,.32); }
+.price-axis { position: absolute; right: 8px; top: 26px; bottom: 82px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; color: #8ea3bc; font-size: 10px; font-weight: 800; }
+.time-axis { position: absolute; left: 47px; right: 54px; bottom: 43px; display: flex; justify-content: space-between; color: #718aa5; font-size: 10px; text-transform: uppercase; }
+.unit-badge { position: absolute; left: 12px; bottom: 10px; border: 1px solid rgba(75,97,123,.22); border-radius: 999px; color: #8fa6c0; background: rgba(5,15,28,.72); padding: 5px 8px; font-size: 10px; }
 
 .heat-panel { min-height: 245px; border-radius: 10px; display: grid; grid-template-columns: 1.1fr .9fr .9fr; gap: 1px; overflow: hidden; background: #142033; }
 .heat-sector { background: #07111d; min-height: 120px; display: flex; flex-direction: column; }
