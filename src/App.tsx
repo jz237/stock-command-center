@@ -506,10 +506,11 @@ function App() {
     ...item,
     value: item.symbol === '10Y' ? `${item.price.toFixed(2)}%` : item.price >= 1000 ? item.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : money(item.price),
   }))
-  const peerRows = [...stocks]
+  const peerUniverse = isMarketSelection ? marketSnapshots : stocks
+  const peerRows = [...peerUniverse]
     .filter((stock) => stock.sector === selected.sector || stock.symbol === selected.symbol)
-    .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, 8)
+    .sort((a, b) => (b.confidence - a.confidence) || (b.change - a.change))
+    .slice(0, 10)
   const chartSeries = useMemo(() => expandedSeries(selected, range), [range, selected])
   const chartChange = chartSeries.length > 1 ? ((chartSeries.at(-1)! - chartSeries[0]) / chartSeries[0]) * 100 : 0
   const activeRange = rangeConfig[range] || rangeConfig['1D']
@@ -664,8 +665,8 @@ function App() {
 
             <section className="panel peer-table">
               <div className="card-title">Peer / Sector Comparison <button onClick={() => { setCategoryFilter(''); openPanel('watchlist') }}>{selected.sector}</button></div>
-              <div className="peer-head"><span>Ticker</span><span>Last</span><span>%</span><span>Cap</span><span>P/E</span><span>Rating</span><span>Trend</span></div>
-              {peerRows.map((stock) => <button key={stock.symbol} onClick={() => setSelectedSymbol(stock.symbol)} className={stock.symbol === selected.symbol ? 'active' : ''}><strong>{stock.symbol}</strong><span>${money(stock.price)}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><span>{stock.marketCap}</span><span>{stock.pe ? stock.pe.toFixed(1) : '—'}</span><span>{stock.rating || 'Watch'}</span><svg viewBox="0 0 72 20"><path d={sparkPath(stock.chart, 72, 20)} /></svg></button>)}
+              <div className="peer-head"><span>Ticker</span><span>Name</span><span>Last</span><span>%</span><span>Cap</span><span>P/E</span><span>Rating</span><span>Conv.</span><span>Target Gap</span><span>Trend</span></div>
+              {peerRows.map((stock) => <button key={stock.symbol} onClick={() => setSelectedSymbol(stock.symbol)} className={stock.symbol === selected.symbol ? 'active' : ''}><strong>{stock.symbol}</strong><span>{stock.name}</span><span>{stock.sector === 'Rates' ? `${money(stock.price)}%` : `$${money(stock.price)}`}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><span>{stock.marketCap}</span><span>{stock.pe ? stock.pe.toFixed(1) : '—'}</span><span>{stock.rating || 'Watch'}</span><span>{stock.confidence}/100</span><b className={stock.targetPrice && stock.targetPrice >= stock.price ? 'up' : 'down'}>{targetUpside(stock)}</b><svg viewBox="0 0 96 22"><path d={sparkPath(stock.chart, 96, 22)} /></svg></button>)}
             </section>
 
             <section className="bottom-grid">

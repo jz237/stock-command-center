@@ -164,12 +164,13 @@ h1 { font-size: 18px; line-height: 1; }
 .catalyst-slice { cursor: pointer; transition: border-color .12s ease, transform .12s ease; }
 .mini-catalyst { display: block; width: 100%; margin-top: 5px; text-align: left; border: 1px solid rgba(75,97,123,.22); border-radius: 7px; background: rgba(255,255,255,.025); color: #dbe8f6; padding: 5px 7px; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.peer-table { border-radius: 10px; padding: 10px; }
-.peer-head, .peer-table button { display: grid; grid-template-columns: 64px 78px 58px 70px 52px 86px 80px; gap: 8px; align-items: center; }
+.peer-table { border-radius: 10px; padding: 10px; overflow: hidden; }
+.peer-head, .peer-table button { display: grid; grid-template-columns: 64px minmax(120px, 1.3fr) 82px 58px 72px 52px 88px 64px 78px 104px; gap: 8px; align-items: center; }
 .peer-head { color: #70869f; font-size: 9px; text-transform: uppercase; padding: 8px 6px 4px; }
-.peer-table button { width: 100%; border: 0; border-top: 1px solid rgba(75,97,123,.18); background: transparent; color: #dbe8f6; padding: 7px 6px; text-align: left; font-size: 11px; }
+.peer-table button { width: 100%; border: 0; border-top: 1px solid rgba(75,97,123,.18); background: transparent; color: #dbe8f6; padding: 8px 6px; text-align: left; font-size: 11px; }
 .peer-table button.active, .peer-table button:hover { background: rgba(67,225,132,.06); }
-.peer-table svg { width: 72px; height: 20px; }
+.peer-table span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.peer-table svg { width: 96px; height: 22px; }
 .peer-table path { fill: none; stroke: #52df82; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 
 .bottom-grid { display: grid; grid-template-columns: 1.1fr .9fr 1fr; gap: 8px; min-height: 150px; overflow: hidden; }
