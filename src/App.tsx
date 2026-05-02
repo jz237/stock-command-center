@@ -62,6 +62,7 @@ const rangeConfig: Record<string, { points: number; label: string; x: string[]; 
 const categories = ['AI & Semiconductors', 'Cloud & Software', 'Consumer Tech', 'Watchlist', 'Long Term Holds']
 const nav = ['▦', '▧', '▤', '▭', '⚙']
 const LIVE_REFRESH_MS = 120_000
+const minCachedChartRows: Record<string, number> = { '1D': 20, '5D': 10, '1M': 15, '3M': 40, '6M': 80, YTD: 20, '1Y': 160, '5Y': 150, MAX: 80 }
 
 function sparkPath(values: number[], width = 96, height = 34) {
   const min = Math.min(...values)
@@ -227,7 +228,7 @@ function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMod
       }
       const cached = historyRef.current?.stocks?.[stock.symbol]?.[range]
       if (cancelled) return
-      if (cached?.length) {
+      if (cached && cached.length >= (minCachedChartRows[range] || 2)) {
         setRows(cached.map((row) => ({ ...row, value: row.close })))
         setSource('cached')
         return
@@ -264,7 +265,7 @@ function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMod
   return <div className="hires-chart"><div className="real-chart" ref={containerRef} />{hover && chartMode === 'Candles' && <div className="ohlc-readout"><span>O <b>${money(hover.open)}</b></span><span>H <b>${money(hover.high)}</b></span><span>L <b>${money(hover.low)}</b></span><span>C <b>${money(hover.close)}</b></span></div>}<div className={`chart-source ${source}`}>{source === 'cached' ? 'StockBot cached history' : source === 'live' ? 'Yahoo live history' : 'Fallback history'}</div></div>
 }
 
-async function fetchYahooQuote(symbol: string): Promise<Partial<Stock> | null> {
+async function fetchYahooQuote(symbol: string, expectedPrice?: number): Promise<Partial<Stock> | null> {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 8_000)
   try {
@@ -279,6 +280,7 @@ async function fetchYahooQuote(symbol: string): Promise<Partial<Stock> | null> {
     const price = Number(meta.regularMarketPrice ?? closes.at(-1))
     const previous = Number(meta.chartPreviousClose ?? closes[0])
     if (!Number.isFinite(price) || !Number.isFinite(previous) || previous === 0) return null
+    if (expectedPrice && Math.abs(price - expectedPrice) / Math.max(expectedPrice, 1) > 0.35) return null
     const volume = (quote?.volume || []).filter((value: number | null) => typeof value === 'number').reduce((sum: number, value: number) => sum + value, 0) / 1_000_000
     return {
       price: Number(price.toFixed(2)),
@@ -339,9 +341,10 @@ function App() {
   useEffect(() => {
     let cancelled = false
     async function refreshLivePrices() {
-      const symbols = liveSymbolsKey.split('|').filter(Boolean)
+      const liveStocks = stocks.filter((stock) => liveSymbolsKey.split('|').includes(stock.symbol))
+      const symbols = liveStocks.map((stock) => stock.symbol)
       if (!symbols.length) return
-      const updates = await Promise.allSettled(symbols.map((symbol) => fetchYahooQuote(symbol)))
+      const updates = await Promise.allSettled(liveStocks.map((stock) => fetchYahooQuote(stock.symbol, stock.price)))
       if (cancelled) return
       const updateMap = new Map<string, Partial<Stock>>()
       updates.forEach((result, index) => {
@@ -364,11 +367,12 @@ function App() {
   }, [liveSymbolsKey])
 
   async function refreshPricesNow() {
-    const symbols = liveSymbolsKey.split('|').filter(Boolean)
+    const liveStocks = stocks.filter((stock) => liveSymbolsKey.split('|').includes(stock.symbol))
+    const symbols = liveStocks.map((stock) => stock.symbol)
     if (!symbols.length || isRefreshing) return
     setIsRefreshing(true)
     setLiveStatus('loading')
-    const updates = await Promise.allSettled(symbols.map((symbol) => fetchYahooQuote(symbol)))
+    const updates = await Promise.allSettled(liveStocks.map((stock) => fetchYahooQuote(stock.symbol, stock.price)))
     const updateMap = new Map<string, Partial<Stock>>()
     updates.forEach((result, index) => {
       if (result.status === 'fulfilled' && result.value) updateMap.set(symbols[index], result.value)
