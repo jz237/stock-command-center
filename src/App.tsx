@@ -98,6 +98,15 @@ function movingAverage(values: number[], windowSize = 8) {
   })
 }
 
+function chartPoint(values: number[], value: number, index: number, width = 877, height = 230) {
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  return {
+    x: 48 + (index / Math.max(values.length - 1, 1)) * width,
+    y: 35 + height - ((value - min) / Math.max(max - min, 1)) * height,
+  }
+}
+
 async function fetchYahooQuote(symbol: string): Promise<Partial<Stock> | null> {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 8_000)
@@ -263,6 +272,10 @@ function App() {
   const chartTicks = [0, 1, 2, 3, 4].map((tick) => chartMax - ((chartMax - chartMin) * tick) / 4)
   const activeRange = rangeConfig[range] || rangeConfig['1D']
   const maSeries = movingAverage(chartSeries, range === '1D' ? 6 : 10)
+  const highIndex = chartSeries.indexOf(chartMax)
+  const lowIndex = chartSeries.indexOf(chartMin)
+  const highPoint = chartPoint(chartSeries, chartMax, highIndex)
+  const lowPoint = chartPoint(chartSeries, chartMin, lowIndex)
 
   function addTicker() {
     const raw = query.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5)
@@ -383,9 +396,13 @@ function App() {
               <div className="rangebar">{ranges.map((item) => <button className={range === item ? 'active' : ''} onClick={() => setRange(item)} key={item}>{item}</button>)}<button onClick={() => setIndicators(!indicators)} className="indicator">⌁ {indicators ? 'SMA on' : 'SMA off'}</button><button onClick={() => openPanel('report')}>⛶</button><button onClick={() => openPanel('catalysts')}>⋯</button></div>
               <div className="chart-toolbar"><div><strong>{range} performance</strong><span>{activeRange.label}</span></div><div className="chart-modes">{(['Line', 'Candles', 'Volume'] as ChartMode[]).map((mode) => <button className={chartMode === mode ? 'active' : ''} onClick={() => setChartMode(mode)} key={mode}>{mode}</button>)}</div><b className={chartChange >= 0 ? 'up' : 'down'}>{chartChange >= 0 ? '+' : ''}{chartChange.toFixed(2)}%</b></div>
               <div className="chart-wrap">
-                <svg className="big-chart" viewBox="0 0 980 360" preserveAspectRatio="none">
+                <svg className="big-chart" viewBox="0 0 980 360" preserveAspectRatio="xMidYMid meet" shapeRendering="geometricPrecision">
+                  <defs>
+                    <linearGradient id="chartArea" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="rgba(41,214,129,.28)"/><stop offset="100%" stopColor="rgba(41,214,129,0)"/></linearGradient>
+                  </defs>
                   {[0,1,2,3,4].map((i) => <line key={i} x1="48" x2="925" y1={35 + i*58} y2={35 + i*58} className="grid"/>)}
                   {[0,1,2,3,4,5].map((i) => <line key={`v-${i}`} x1={48 + i*175.4} x2={48 + i*175.4} y1="35" y2="268" className="grid vertical"/>)}
+                  {chartMode !== 'Volume' && <path className="area" d={`${sparkPath(chartSeries, 877, 230)} L877 230 L0 230 Z`} transform="translate(48 35)"/>}
                   {chartMode !== 'Volume' && indicators && <path className="ma" d={sparkPath(maSeries, 877, 230)} transform="translate(48 35)"/>}
                   {chartMode !== 'Volume' && <path className="line" d={sparkPath(chartSeries, 877, 230)} transform="translate(48 35)"/>}
                   {chartMode === 'Candles' && chartSeries.slice(-34).map((v, i, arr) => {
@@ -401,6 +418,8 @@ function App() {
                     const height = 18 + Math.abs(v - prev) / Math.max(chartMax - chartMin, 1) * 68 + ((i * 7) % 22)
                     return <rect key={`vol-${i}`} x={55 + i*24} y={328 - height} width="15" height={height} className={up ? 'greenvol' : 'redvol'} />
                   })}
+                  {chartMode !== 'Volume' && <g className="price-marker high" transform={`translate(${Math.min(highPoint.x, 840)} ${highPoint.y})`}><line x1="0" x2="84" y1="0" y2="0"/><circle cx="0" cy="0" r="5"/><rect x="10" y="-15" width="82" height="28" rx="7"/><text x="18" y="-3">High</text><text x="18" y="10">${money(chartMax)}</text></g>}
+                  {chartMode !== 'Volume' && <g className="price-marker low" transform={`translate(${Math.min(lowPoint.x, 840)} ${lowPoint.y})`}><line x1="0" x2="84" y1="0" y2="0"/><circle cx="0" cy="0" r="5"/><rect x="10" y="-15" width="82" height="28" rx="7"/><text x="18" y="-3">Low</text><text x="18" y="10">${money(chartMin)}</text></g>}
                 </svg>
                 <div className="price-axis">{chartTicks.map((tick) => <span key={tick}>${money(tick, tick > 100 ? 0 : 2)}</span>)}</div>
                 <div className="time-axis">{activeRange.x.map((label) => <span key={label}>{label}</span>)}</div>
