@@ -115,18 +115,17 @@ h1 { font-size: 18px; line-height: 1; }
 .area { fill: url(#chartArea); opacity: .9; pointer-events: none; }
 .line { fill: none; stroke: #29d681; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 10px rgba(41,214,129,.5)); }
 .ma { fill: none; stroke: rgba(125,103,255,.9); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; stroke-dasharray: 6 6; }
-.candle { stroke-width: 1.6; vector-effect: non-scaling-stroke; shape-rendering: crispEdges; }
+.candle { stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .body.upc, .upc { fill: #40d982; stroke: #40d982; }
 .body.downc, .downc { fill: #f05268; stroke: #f05268; }
-.body { shape-rendering: crispEdges; }
+.body { vector-effect: non-scaling-stroke; }
 .greenvol { fill: rgba(64,217,130,.32); shape-rendering: crispEdges; }
 .redvol { fill: rgba(240,82,104,.32); shape-rendering: crispEdges; }
-.price-marker line { stroke: rgba(226,239,251,.38); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-dasharray: 3 4; }
-.price-marker circle { stroke: #07111d; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.price-marker rect { fill: rgba(5,15,28,.88); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.price-marker text { font-size: 9px; font-weight: 900; fill: #e9f6ff; text-transform: uppercase; letter-spacing: .04em; }
-.price-marker.high circle, .price-marker.high rect { fill: rgba(15,92,54,.92); stroke: rgba(67,225,132,.55); }
-.price-marker.low circle, .price-marker.low rect { fill: rgba(94,28,37,.92); stroke: rgba(255,101,121,.55); }
+.hover-hit { fill: transparent; cursor: crosshair; }
+.candle-tooltip { position: absolute; z-index: 5; min-width: 118px; border: 1px solid rgba(226,239,251,.18); border-radius: 9px; background: rgba(4,12,22,.94); box-shadow: 0 14px 40px rgba(0,0,0,.45); color: #dcecff; padding: 8px 9px; pointer-events: none; transform: translate(-50%, -100%); }
+.candle-tooltip strong { display: block; margin-bottom: 5px; color: #f2f8ff; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.candle-tooltip span { display: flex; justify-content: space-between; gap: 14px; color: #8ea3bc; font-size: 11px; line-height: 1.45; }
+.candle-tooltip b { color: #ffffff; }
 .price-axis { position: absolute; right: 8px; top: 26px; bottom: 82px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; color: #8ea3bc; font-size: 10px; font-weight: 800; }
 .time-axis { position: absolute; left: 47px; right: 54px; bottom: 43px; display: flex; justify-content: space-between; color: #718aa5; font-size: 10px; text-transform: uppercase; }
 .unit-badge { position: absolute; left: 12px; bottom: 10px; border: 1px solid rgba(75,97,123,.22); border-radius: 999px; color: #8fa6c0; background: rgba(5,15,28,.72); padding: 5px 8px; font-size: 10px; }

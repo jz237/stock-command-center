@@ -28,6 +28,7 @@ type PortfolioSeed = {
 
 type DetailPanel = 'report' | 'catalysts' | 'risks' | 'watchlist' | null
 type ChartMode = 'Line' | 'Candles' | 'Volume'
+type CandleHover = { x: number; y: number; high: number; low: number; open: number; close: number; index: number } | null
 
 const fallbackStocks: Stock[] = [
   {
@@ -98,15 +99,6 @@ function movingAverage(values: number[], windowSize = 8) {
   })
 }
 
-function chartPoint(values: number[], value: number, index: number, width = 877, height = 230) {
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  return {
-    x: 48 + (index / Math.max(values.length - 1, 1)) * width,
-    y: 35 + height - ((value - min) / Math.max(max - min, 1)) * height,
-  }
-}
-
 async function fetchYahooQuote(symbol: string): Promise<Partial<Stock> | null> {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 8_000)
@@ -152,6 +144,7 @@ function App() {
   const [lastLiveUpdate, setLastLiveUpdate] = useState<string>('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [detailPanel, setDetailPanel] = useState<DetailPanel>(null)
+  const [hoveredCandle, setHoveredCandle] = useState<CandleHover>(null)
   const liveSymbolsKey = useMemo(() => stocks.map((stock) => stock.symbol).join('|'), [stocks])
 
   useEffect(() => {
@@ -272,10 +265,13 @@ function App() {
   const chartTicks = [0, 1, 2, 3, 4].map((tick) => chartMax - ((chartMax - chartMin) * tick) / 4)
   const activeRange = rangeConfig[range] || rangeConfig['1D']
   const maSeries = movingAverage(chartSeries, range === '1D' ? 6 : 10)
-  const highIndex = chartSeries.indexOf(chartMax)
-  const lowIndex = chartSeries.indexOf(chartMin)
-  const highPoint = chartPoint(chartSeries, chartMax, highIndex)
-  const lowPoint = chartPoint(chartSeries, chartMin, lowIndex)
+  const candleSeries = chartSeries.slice(-42).map((close, index, arr) => {
+    const open = index === 0 ? chartSeries[Math.max(0, chartSeries.length - arr.length - 1)] || close : arr[index - 1]
+    const spread = Math.max(Math.abs(close - open) * 0.75, (chartMax - chartMin) * 0.018)
+    const high = Math.max(open, close) + spread * (0.8 + (index % 5) * 0.08)
+    const low = Math.min(open, close) - spread * (0.72 + (index % 4) * 0.07)
+    return { open, close, high, low, up: close >= open }
+  })
 
   function addTicker() {
     const raw = query.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5)
@@ -396,7 +392,7 @@ function App() {
               <div className="rangebar">{ranges.map((item) => <button className={range === item ? 'active' : ''} onClick={() => setRange(item)} key={item}>{item}</button>)}<button onClick={() => setIndicators(!indicators)} className="indicator">⌁ {indicators ? 'SMA on' : 'SMA off'}</button><button onClick={() => openPanel('report')}>⛶</button><button onClick={() => openPanel('catalysts')}>⋯</button></div>
               <div className="chart-toolbar"><div><strong>{range} performance</strong><span>{activeRange.label}</span></div><div className="chart-modes">{(['Line', 'Candles', 'Volume'] as ChartMode[]).map((mode) => <button className={chartMode === mode ? 'active' : ''} onClick={() => setChartMode(mode)} key={mode}>{mode}</button>)}</div><b className={chartChange >= 0 ? 'up' : 'down'}>{chartChange >= 0 ? '+' : ''}{chartChange.toFixed(2)}%</b></div>
               <div className="chart-wrap">
-                <svg className="big-chart" viewBox="0 0 980 360" preserveAspectRatio="xMidYMid meet" shapeRendering="geometricPrecision">
+                <svg className="big-chart" viewBox="0 0 980 360" preserveAspectRatio="none" shapeRendering="geometricPrecision" onMouseLeave={() => setHoveredCandle(null)}>
                   <defs>
                     <linearGradient id="chartArea" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="rgba(41,214,129,.28)"/><stop offset="100%" stopColor="rgba(41,214,129,0)"/></linearGradient>
                   </defs>
@@ -405,12 +401,20 @@ function App() {
                   {chartMode !== 'Volume' && <path className="area" d={`${sparkPath(chartSeries, 877, 230)} L877 230 L0 230 Z`} transform="translate(48 35)"/>}
                   {chartMode !== 'Volume' && indicators && <path className="ma" d={sparkPath(maSeries, 877, 230)} transform="translate(48 35)"/>}
                   {chartMode !== 'Volume' && <path className="line" d={sparkPath(chartSeries, 877, 230)} transform="translate(48 35)"/>}
-                  {chartMode === 'Candles' && chartSeries.slice(-34).map((v, i, arr) => {
-                    const prev = arr[Math.max(i - 1, 0)]
-                    const up = v >= prev
-                    const body = Math.max(8, Math.min(44, Math.abs(v - prev) / Math.max(chartMax - chartMin, 1) * 110 + 8))
-                    const y = 35 + (1 - ((v - chartMin) / Math.max(chartMax - chartMin, 1))) * 230
-                    return <g key={i} transform={`translate(${60 + i * 25.5}, ${y})`}><line y1={-18} y2={body + 18} className={up ? 'candle upc' : 'candle downc'} /><rect x="-6" y="0" width="12" height={body} rx="2" className={up ? 'body upc' : 'body downc'} /></g>
+                  {chartMode === 'Candles' && candleSeries.map((candle, i) => {
+                    const x = 58 + i * (850 / Math.max(candleSeries.length - 1, 1))
+                    const yFor = (value: number) => 35 + (1 - ((value - chartMin) / Math.max(chartMax - chartMin, 1))) * 230
+                    const highY = yFor(candle.high)
+                    const lowY = yFor(candle.low)
+                    const openY = yFor(candle.open)
+                    const closeY = yFor(candle.close)
+                    const bodyY = Math.min(openY, closeY)
+                    const bodyHeight = Math.max(3, Math.abs(closeY - openY))
+                    return <g key={i} onMouseEnter={() => setHoveredCandle({ x, y: bodyY, index: i, high: candle.high, low: candle.low, open: candle.open, close: candle.close })}>
+                      <line x1={x} x2={x} y1={highY} y2={lowY} className={candle.up ? 'candle upc' : 'candle downc'} />
+                      <rect x={x - 5} y={bodyY} width="10" height={bodyHeight} rx="1.5" className={candle.up ? 'body upc' : 'body downc'} />
+                      <rect x={x - 10} y="35" width="20" height="230" className="hover-hit" />
+                    </g>
                   })}
                   {chartSeries.slice(-36).map((v, i, arr) => {
                     const prev = arr[Math.max(i - 1, 0)]
@@ -418,9 +422,14 @@ function App() {
                     const height = 18 + Math.abs(v - prev) / Math.max(chartMax - chartMin, 1) * 68 + ((i * 7) % 22)
                     return <rect key={`vol-${i}`} x={55 + i*24} y={328 - height} width="15" height={height} className={up ? 'greenvol' : 'redvol'} />
                   })}
-                  {chartMode !== 'Volume' && <g className="price-marker high" transform={`translate(${Math.min(highPoint.x, 840)} ${highPoint.y})`}><line x1="0" x2="84" y1="0" y2="0"/><circle cx="0" cy="0" r="5"/><rect x="10" y="-15" width="82" height="28" rx="7"/><text x="18" y="-3">High</text><text x="18" y="10">${money(chartMax)}</text></g>}
-                  {chartMode !== 'Volume' && <g className="price-marker low" transform={`translate(${Math.min(lowPoint.x, 840)} ${lowPoint.y})`}><line x1="0" x2="84" y1="0" y2="0"/><circle cx="0" cy="0" r="5"/><rect x="10" y="-15" width="82" height="28" rx="7"/><text x="18" y="-3">Low</text><text x="18" y="10">${money(chartMin)}</text></g>}
                 </svg>
+                {hoveredCandle && chartMode === 'Candles' && <div className="candle-tooltip" style={{ left: `${Math.min(78, Math.max(8, hoveredCandle.x / 9.8))}%`, top: `${Math.max(42, hoveredCandle.y + 4)}px` }}>
+                  <strong>Candle {hoveredCandle.index + 1}</strong>
+                  <span>High <b>${money(hoveredCandle.high)}</b></span>
+                  <span>Low <b>${money(hoveredCandle.low)}</b></span>
+                  <span>Open <b>${money(hoveredCandle.open)}</b></span>
+                  <span>Close <b>${money(hoveredCandle.close)}</b></span>
+                </div>}
                 <div className="price-axis">{chartTicks.map((tick) => <span key={tick}>${money(tick, tick > 100 ? 0 : 2)}</span>)}</div>
                 <div className="time-axis">{activeRange.x.map((label) => <span key={label}>{label}</span>)}</div>
                 <div className="unit-badge">USD / share · volume bars in relative millions</div>
