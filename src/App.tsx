@@ -465,6 +465,11 @@ function App() {
     { label: 'Next', type: 'Bull trigger', text: selected.catalysts[1] || selected.opportunities[0] || 'Watch for confirmation in the next major update.', tone: 'up' },
     { label: 'Risk', type: 'Risk trigger', text: selected.risks[0] || selected.catalysts[2] || 'No specific risk trigger recorded yet.', tone: 'down' },
   ]
+  const catalystWorkbench = [
+    ...selected.catalysts.map((text, index) => ({ label: index === 0 ? 'Primary' : `C${index + 1}`, type: index === 0 ? 'Main catalyst' : 'Watch item', text, tone: index < 2 ? 'up' : 'neutral' })),
+    ...selected.opportunities.slice(0, 4).map((text, index) => ({ label: `Bull ${index + 1}`, type: 'Upside trigger', text, tone: 'up' })),
+    ...selected.risks.slice(0, 4).map((text, index) => ({ label: `Risk ${index + 1}`, type: 'Downside trigger', text, tone: 'down' })),
+  ]
   const visibleWatchlist = query || categoryFilter ? filtered : stocks
   const hiddenWatchlistCount = query || categoryFilter ? 0 : Math.max(0, stocks.length - visibleWatchlist.length)
   const inPortfolio = saved.includes(selected.symbol)
@@ -529,6 +534,11 @@ function App() {
     setDetailPanel(panel)
     window.history.replaceState(null, '', `#${panel}`)
     window.setTimeout(() => document.querySelector('.detail-drawer')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+  }
+
+  function openCatalystArticle(text: string) {
+    const query = encodeURIComponent(`${selected.symbol} ${selected.name} ${text}`)
+    window.open(`https://www.google.com/search?tbm=nws&q=${query}`, '_blank', 'noopener,noreferrer')
   }
 
   function closePanel() {
@@ -634,12 +644,14 @@ function App() {
             </section>
           </section>
 
-          <aside className="right-stack">
+          <aside className={`right-stack ${detailPanel === 'catalysts' ? 'catalyst-mode' : ''}`}>
+            {detailPanel === 'catalysts' ? <section className="panel catalyst-workbench"><div className="card-title">{selected.symbol} Catalyst Workbench <button onClick={closePanel}>Collapse</button></div><p className="workbench-note">Click any item to open a live news search for that catalyst.</p>{catalystWorkbench.map((item) => <button className="workbench-row" onClick={() => openCatalystArticle(item.text)} key={`${item.label}-${item.text}`}><span>{item.label}</span><strong>{item.text}</strong><b className={item.tone}>{item.type}</b></button>)}</section> : <>
             <section className="panel catalyst-card"><div className="card-title">Catalyst Radar <button onClick={() => openPanel('catalysts')}>{selected.symbol}</button></div>{catalystRadar.map((item) => <article key={`${selected.symbol}-${item.label}`} onClick={() => openPanel('catalysts')}><span>{item.label}</span><strong>{item.text}</strong><b className={`${item.tone} badge`}>{item.type}</b></article>)}</section>
             <section className="panel ai-card"><div className="ai-label">AI</div><div className="card-title">AI Research Summary</div><h2>{selected.symbol} <small>{selected.name}</small></h2><b className="rating">⌁ {selected.confidence > 82 ? 'Strong Bullish' : selected.confidence > 68 ? 'Constructive' : 'Watch Carefully'}</b><p>{view === 'News' ? selected.catalysts.join(' · ') : view === 'Portfolio' ? `${selected.symbol} portfolio exposure can be tracked here. Save it, monitor catalysts, and compare it against the rest of the watchlist.` : selected.thesis}</p><div className="drivers"><span>Key Drivers</span>{selected.opportunities.slice(0,4).map((item) => <em key={item}>● {item}</em>)}</div><button onClick={() => openPanel('report')} className="full-report">View Full Research Report ›</button></section>
             {view === 'Portfolio' && <section className="panel holdings-editor"><div className="card-title">Public Tracker <button onClick={addSelectedHolding}>Track {selected.symbol}</button></div>{positions.map((position) => <div className="holding-row public" key={position.symbol}><strong>{position.symbol}</strong><span>{position.stock ? `$${money(position.stock.price)}` : 'No quote'}</span><b className={position.stock && position.stock.change >= 0 ? 'up' : 'down'}>{position.stock ? `${position.stock.change >= 0 ? '+' : ''}${position.stock.change.toFixed(2)}%` : '—'}</b></div>)}<small>Only ticker symbols and market performance are stored here. Cash, share counts, cost basis, and personal portfolio values are intentionally not included.</small></section>}
             <section className="panel risks"><div className="card-title">Risks & Opportunities <button onClick={() => openPanel('risks')}>View all</button></div><h3>Opportunities</h3>{selected.opportunities.slice(0,2).map((item) => <p className="good" key={item}>● {item}</p>)}<h3>Risks</h3>{selected.risks.slice(0,2).map((item) => <p className="bad" key={item}>● {item}</p>)}<button onClick={toggleSave} className="save">★ {inPortfolio ? 'Saved to Portfolio' : 'Save to Portfolio'}</button></section>
             <section className="panel market-summary"><div className="card-title">Market Summary</div><strong>S&P 500<br/>5,321.41</strong><span className="up">+0.71%</span><svg viewBox="0 0 230 72"><path d="M0 54 L18 50 L32 53 L45 43 L62 44 L78 34 L96 38 L113 30 L130 28 L147 35 L162 22 L178 26 L194 18 L213 20 L230 15" /></svg><div className="breadth"><span>Advancing <b>382</b></span><span>Declining <b>118</b></span><span>Unchanged <b>22</b></span></div><div className="bar"><i/><i/><i/></div></section>
+            </>}
           </aside>
         </div>
         {detailPanel && <section className="detail-drawer panel">
