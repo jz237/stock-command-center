@@ -177,7 +177,9 @@ function App() {
     return acc
   }, {})
   const movers = [...stocks].sort((a, b) => b.change - a.change).slice(0, 5)
-  const latestCatalysts = stocks.flatMap((stock) => stock.catalysts.slice(0, 1).map((title) => ({ stock, title }))).slice(0, 4)
+  const latestCatalysts = stocks.flatMap((stock) => stock.catalysts.slice(0, 1).map((title) => ({ stock, title }))).slice(0, 3)
+  const visibleWatchlist = query ? filtered : stocks.slice(0, 12)
+  const hiddenWatchlistCount = query ? 0 : Math.max(0, stocks.length - visibleWatchlist.length)
   const inPortfolio = saved.includes(selected.symbol)
 
   function addTicker() {
@@ -238,7 +240,7 @@ function App() {
         <button className="watch-select">★ Tech Leaders <span>⌄</span></button>
         <div className="watch-labels"><span>Ticker</span><span>Price</span><span>24H %</span></div>
         <div className="watchlist">
-          {(query ? filtered : stocks).map((stock) => (
+          {visibleWatchlist.map((stock) => (
             <button key={stock.symbol} className={`watch ${stock.symbol === selected.symbol ? 'active' : ''}`} onClick={() => setSelectedSymbol(stock.symbol)}>
               <strong>{stock.symbol}</strong>
               <svg viewBox="0 0 90 28"><path d={sparkPath(stock.chart, 90, 28)} /></svg>
@@ -246,6 +248,7 @@ function App() {
               <b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b>
             </button>
           ))}
+          {hiddenWatchlistCount > 0 && <div className="watch-more">+{hiddenWatchlistCount} more tracked names · search to filter</div>}
         </div>
         <div className="folders">
           {categories.map((category, index) => <button key={category}>▸ {category}<b>{[8, 7, 6, 12, 15][index]}</b></button>)}
@@ -307,10 +310,10 @@ function App() {
           </section>
 
           <aside className="right-stack">
-            <section className="panel catalyst-card"><div className="card-title">Latest Catalysts <button>View all</button></div>{latestCatalysts.map(({ stock, title }, index) => <article key={`${stock.symbol}-${title}`}><span>{[2,4,4,7][index]}h ago</span><strong>{title}</strong><b className={stock.change >= 0 ? 'up badge' : 'down badge'}>{stock.change >= 0 ? 'Bullish' : 'Watch'}</b></article>)}</section>
+            <section className="panel catalyst-card"><div className="card-title">Latest Catalysts <button>View all</button></div>{latestCatalysts.map(({ stock, title }, index) => <article key={`${stock.symbol}-${title}`}><span>{[2,4,7][index]}h ago</span><strong>{title}</strong><b className={stock.change >= 0 ? 'up badge' : 'down badge'}>{stock.change >= 0 ? 'Bullish' : 'Watch'}</b></article>)}</section>
             <section className="panel ai-card"><div className="ai-label">AI</div><div className="card-title">AI Research Summary</div><h2>{selected.symbol} <small>{selected.name}</small></h2><b className="rating">⌁ {selected.confidence > 82 ? 'Strong Bullish' : selected.confidence > 68 ? 'Constructive' : 'Watch Carefully'}</b><p>{view === 'News' ? selected.catalysts.join(' · ') : view === 'Portfolio' ? `${selected.symbol} portfolio exposure can be tracked here. Save it, monitor catalysts, and compare it against the rest of the watchlist.` : selected.thesis}</p><div className="drivers"><span>Key Drivers</span>{selected.opportunities.slice(0,4).map((item) => <em key={item}>● {item}</em>)}</div><button className="full-report">View Full Research Report ›</button></section>
             {view === 'Portfolio' && <section className="panel holdings-editor"><div className="card-title">Public Tracker <button onClick={addSelectedHolding}>Track {selected.symbol}</button></div>{positions.map((position) => <div className="holding-row public" key={position.symbol}><strong>{position.symbol}</strong><span>{position.stock ? `$${money(position.stock.price)}` : 'No quote'}</span><b className={position.stock && position.stock.change >= 0 ? 'up' : 'down'}>{position.stock ? `${position.stock.change >= 0 ? '+' : ''}${position.stock.change.toFixed(2)}%` : '—'}</b></div>)}<small>Only ticker symbols and market performance are stored here. Cash, share counts, cost basis, and personal portfolio values are intentionally not included.</small></section>}
-            <section className="panel risks"><div className="card-title">Risks & Opportunities <button>View all</button></div><h3>Opportunities</h3>{selected.opportunities.slice(0,3).map((item) => <p className="good" key={item}>● {item}</p>)}<h3>Risks</h3>{selected.risks.slice(0,3).map((item) => <p className="bad" key={item}>● {item}</p>)}<button onClick={toggleSave} className="save">★ {inPortfolio ? 'Saved to Portfolio' : 'Save to Portfolio'}</button></section>
+            <section className="panel risks"><div className="card-title">Risks & Opportunities <button>View all</button></div><h3>Opportunities</h3>{selected.opportunities.slice(0,2).map((item) => <p className="good" key={item}>● {item}</p>)}<h3>Risks</h3>{selected.risks.slice(0,2).map((item) => <p className="bad" key={item}>● {item}</p>)}<button onClick={toggleSave} className="save">★ {inPortfolio ? 'Saved to Portfolio' : 'Save to Portfolio'}</button></section>
             <section className="panel market-summary"><div className="card-title">Market Summary</div><strong>S&P 500<br/>5,321.41</strong><span className="up">+0.71%</span><svg viewBox="0 0 230 72"><path d="M0 54 L18 50 L32 53 L45 43 L62 44 L78 34 L96 38 L113 30 L130 28 L147 35 L162 22 L178 26 L194 18 L213 20 L230 15" /></svg><div className="breadth"><span>Advancing <b>382</b></span><span>Declining <b>118</b></span><span>Unchanged <b>22</b></span></div><div className="bar"><i/><i/><i/></div></section>
           </aside>
         </div>
