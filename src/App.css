@@ -35,7 +35,8 @@ button { cursor: pointer; }
   backdrop-filter: saturate(1.08);
 }
 .rail { border-right: 1px solid #182537; padding: 9px 6px; display: flex; flex-direction: column; gap: 10px; align-items: center; background: #050c15; }
-.signal { height: 28px; display: flex; align-items: end; gap: 3px; }
+.signal { height: 28px; display: flex; align-items: end; gap: 3px; text-decoration: none; cursor: pointer; }
+.signal:hover { filter: brightness(1.18); }
 .signal i { width: 5px; border-radius: 3px; background: #28d786; box-shadow: 0 0 12px rgba(40,215,134,.5); }
 .signal i:nth-child(1){height:11px}.signal i:nth-child(2){height:18px}.signal i:nth-child(3){height:26px}
 .rail button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(97,120,145,.26); background: #081321; color: #8aa2bd; }
