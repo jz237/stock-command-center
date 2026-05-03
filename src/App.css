@@ -35,11 +35,9 @@ button { cursor: pointer; }
   backdrop-filter: saturate(1.08);
 }
 .rail { border-right: 1px solid #182537; padding: 9px 6px; display: flex; flex-direction: column; gap: 10px; align-items: center; background: #050c15; }
-.signal { height: 28px; display: flex; align-items: end; gap: 3px; text-decoration: none; cursor: pointer; }
-.signal:hover { filter: brightness(1.18); }
-.home-signal span { align-self: center; margin-right: 2px; color: #d9ffe8; font-size: 15px; line-height: 1; text-shadow: 0 0 10px rgba(40,215,134,.55); }
-.signal i { width: 5px; border-radius: 3px; background: #28d786; box-shadow: 0 0 12px rgba(40,215,134,.5); }
-.signal i:nth-child(1){height:11px}.signal i:nth-child(2){height:18px}.signal i:nth-child(3){height:26px}
+.home-link { min-height: 34px; display: grid; place-items: center; gap: 2px; border: 1px solid rgba(67,225,132,.34); border-radius: 9px; background: rgba(67,225,132,.08); color: #d9ffe8; text-decoration: none; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; box-shadow: 0 0 14px rgba(40,215,134,.12); }
+.home-link span { font-size: 18px; line-height: 1; text-shadow: 0 0 10px rgba(40,215,134,.55); }
+.home-link:hover { border-color: rgba(67,225,132,.62); background: rgba(67,225,132,.15); filter: brightness(1.12); }
 .rail button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(97,120,145,.26); background: #081321; color: #8aa2bd; }
 .rail button.hot, .rail button:hover { color: #dff7ff; border-color: rgba(56,189,248,.45); background: rgba(56,189,248,.08); }
 
