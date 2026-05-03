@@ -600,7 +600,7 @@ function App() {
   return (
     <main className="terminal">
       <nav className="rail">
-        <a className="signal" href="https://jz237.github.io/jez237-site/?v=3fee6936" title="Back to homepage" aria-label="Back to homepage"><i/><i/><i/></a>
+        <a className="signal home-signal" href="https://jz237.github.io/jez237-site/?v=3fee6936" title="Back to homepage" aria-label="Back to homepage"><span>⌂</span><i/><i/><i/></a>
         {nav.map((item, index) => <button onClick={() => index === 0 ? openPanel('watchlist') : index === 1 ? openPanel('report') : index === 2 ? openCatalysts() : index === 3 ? openPanel('risks') : setView('Portfolio')} className={index === 1 ? 'hot' : ''} key={item}>{item}</button>)}
       </nav>
 
