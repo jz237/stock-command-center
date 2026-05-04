@@ -3,10 +3,9 @@ name: Refresh stock prices
 on:
   workflow_dispatch:
   schedule:
-    # Every 30 minutes during the core US market window, Monday-Friday.
-    - cron: '*/30 14-21 * * 1-5'
-    # One final pass after the close.
-    - cron: '5 22 * * 1-5'
+    # Broad UTC window covering 9:30 AM–4:00 PM New York time across DST changes.
+    # scripts/update-prices.mjs enforces exact NYSE weekdays, holidays, and regular-session hours.
+    - cron: '*/30 13-21 * * 1-5'
 
 permissions:
   contents: write
