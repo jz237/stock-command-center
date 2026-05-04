@@ -6,7 +6,7 @@ const files = [
   path.join(root, 'data', 'stocks.json'),
   path.join(root, 'public', 'data', 'stocks.json'),
 ]
-const apiBase = 'https://stockprices.dev/api/stocks'
+const stockPricesApiBase = 'https://stockprices.dev/api/stocks'
 
 function reshapeChart(existing, latestPrice) {
   const values = Array.isArray(existing) && existing.length ? existing.map(Number).filter(Number.isFinite) : []
@@ -21,20 +21,57 @@ function reshapeChart(existing, latestPrice) {
   return [...scaled, Number(latestPrice.toFixed(2))].slice(-30)
 }
 
-async function fetchQuote(symbol) {
-  const response = await fetch(`${apiBase}/${encodeURIComponent(symbol)}`, {
+async function fetchYahooQuote(symbol) {
+  const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d`, {
     headers: { accept: 'application/json', 'user-agent': 'stock-command-center/1.0' },
   })
-  if (!response.ok) throw new Error(`${symbol}: ${response.status} ${response.statusText}`)
+  if (!response.ok) throw new Error(`Yahoo ${symbol}: ${response.status} ${response.statusText}`)
+  const payload = await response.json()
+  const result = payload?.chart?.result?.[0]
+  const meta = result?.meta
+  const price = Number(meta?.regularMarketPrice)
+  const previousClose = Number(meta?.previousClose ?? meta?.chartPreviousClose)
+  if (!Number.isFinite(price) || !Number.isFinite(previousClose) || previousClose === 0) {
+    throw new Error(`Yahoo ${symbol}: malformed quote ${JSON.stringify(meta)}`)
+  }
+  const changeAmount = price - previousClose
+  const change = (changeAmount / previousClose) * 100
+  return {
+    name: meta?.shortName || meta?.longName,
+    price,
+    change,
+    changeAmount,
+    source: 'yahoo-finance-chart',
+  }
+}
+
+async function fetchStockPricesDevQuote(symbol) {
+  const response = await fetch(`${stockPricesApiBase}/${encodeURIComponent(symbol)}`, {
+    headers: { accept: 'application/json', 'user-agent': 'stock-command-center/1.0' },
+  })
+  if (!response.ok) throw new Error(`stockprices.dev ${symbol}: ${response.status} ${response.statusText}`)
   const quote = await response.json()
   const price = Number(quote.Price)
   const change = Number(quote.ChangePercentage)
-  if (!Number.isFinite(price) || !Number.isFinite(change)) throw new Error(`${symbol}: malformed quote ${JSON.stringify(quote)}`)
+  if (!Number.isFinite(price) || !Number.isFinite(change)) throw new Error(`stockprices.dev ${symbol}: malformed quote ${JSON.stringify(quote)}`)
   return {
     name: quote.Name,
     price,
     change,
     changeAmount: Number(quote.ChangeAmount),
+    source: 'stockprices.dev',
+  }
+}
+
+async function fetchQuote(symbol) {
+  try {
+    return await fetchYahooQuote(symbol)
+  } catch (yahooError) {
+    try {
+      return await fetchStockPricesDevQuote(symbol)
+    } catch (stockPricesError) {
+      throw new Error(`${symbol}: ${yahooError instanceof Error ? yahooError.message : yahooError}; ${stockPricesError instanceof Error ? stockPricesError.message : stockPricesError}`)
+    }
   }
 }
 
@@ -51,7 +88,7 @@ async function main() {
       stock.price = Number(quote.price.toFixed(2))
       stock.change = Number(quote.change.toFixed(2))
       stock.changeAmount = Number.isFinite(quote.changeAmount) ? Number(quote.changeAmount.toFixed(2)) : undefined
-      stock.quoteSource = 'stockprices.dev'
+      stock.quoteSource = quote.source
       stock.quoteUpdatedAt = now
       stock.chart = reshapeChart(stock.chart, stock.price)
       updated.push(stock.symbol)
