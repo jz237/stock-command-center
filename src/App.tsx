@@ -1,80 +1,70 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AreaSeries, CandlestickSeries, HistogramSeries, createChart, type IChartApi, type ISeriesApi, type Time } from 'lightweight-charts'
 import './App.css'
+
+// All market data comes from the JSON files committed/deployed by the
+// scheduled GitHub Action (scripts/update-prices.mjs + update-history.mjs).
+// Browsers cannot call Yahoo/Cboe/etc. directly — those APIs send no CORS
+// headers — so there is intentionally no client-side quote fetching here.
 
 type Stock = {
   symbol: string
   dataSymbol?: string
+  kind?: 'equity' | 'instrument'
   name: string
   sector: string
   price: number
   change: number
-  marketCap: string
-  pe?: number | null
-  targetPrice?: number | null
-  range52w?: [number | null, number | null]
+  changeAmount?: number
+  prevClose?: number
+  dayLow?: number | null
+  dayHigh?: number | null
+  range52w?: [number, number]
+  volume?: number | null
+  currency?: string
+  exchange?: string | null
+  chart: number[]
   rating?: string
   confidence: number
   thesis: string
   risks: string[]
   opportunities: string[]
   catalysts: string[]
-  chart: number[]
-  volume?: number
-  dataSource?: 'static' | 'live' | 'stockbot'
+  quoteUpdatedAt?: string
 }
 
-type PortfolioSeed = {
-  positions: { symbol: string }[]
-}
+type StocksPayload = { updatedAt: string; source?: string; stocks: Stock[] }
+type PortfolioSeed = { positions: { symbol: string }[] }
+type Holding = { shares: number; avgCost: number }
+type CompactBar = [number | string, number, number, number, number, number]
+type SeriesKey = 'i1d' | 'i5d' | 'd1y' | 'w5y' | 'mmax'
+type HistoryPayload = { updatedAt: string; symbols: Record<string, Partial<Record<SeriesKey, CompactBar[]>>> }
+type ChartRow = { time: Time; open: number; high: number; low: number; close: number; volume: number }
 
 type DetailPanel = 'report' | 'research' | 'catalysts' | 'risks' | 'watchlist' | null
 type ChartMode = 'Line' | 'Candles' | 'Volume'
-type ChartRow = { time: Time; open: number; high: number; low: number; close: number; value: number; volume: number }
-type HistoryPayload = { updatedAt: string; source?: string; stocks: Record<string, Record<string, ChartRow[]>> }
+type SortKey = 'default' | 'symbol' | 'price' | 'change'
+
+const ranges = ['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', '5Y', 'MAX'] as const
+const rangeLabels: Record<string, string> = {
+  '1D': 'Last session · 5 minute bars',
+  '5D': '5 trading days · 30 minute bars',
+  '1M': '1 month · daily bars',
+  '3M': '3 months · daily bars',
+  '6M': '6 months · daily bars',
+  YTD: 'Year to date · daily bars',
+  '1Y': '1 year · daily bars',
+  '5Y': '5 years · weekly bars',
+  MAX: 'Full history · monthly bars',
+}
+const DATA_REFRESH_MS = 10 * 60 * 1000
 
 const fallbackStocks: Stock[] = [
   {
-    symbol: 'NVDA', name: 'NVIDIA', sector: 'Semiconductors', price: 1224.4, change: 4.35, marketCap: '$3.01T', pe: 72.45, confidence: 94,
-    thesis: 'NVIDIA remains the cleanest large-cap AI infrastructure story: accelerators, networking, and software demand are still running ahead of supply.',
-    risks: ['Customer concentration among hyperscalers', 'Export restrictions can pressure China revenue', 'Any Blackwell delay would hit sentiment fast'],
-    opportunities: ['Blackwell ramp refreshes the upgrade cycle', 'Networking attach rates can lift system revenue', 'Enterprise AI software is still early'],
-    catalysts: ['NVDA Q1 revenue beats estimates', 'Blackwell shipment updates', 'Hyperscaler capex commentary'],
-    chart: [1080, 1092, 1088, 1104, 1118, 1109, 1132, 1150, 1141, 1166, 1184, 1178, 1195, 1217, 1224], volume: 61.23,
+    symbol: 'NVDA', name: 'NVIDIA', sector: 'Semiconductors', price: 0, change: 0, confidence: 88,
+    thesis: 'Data is still loading. If this message persists, the price data files could not be fetched.',
+    risks: ['Data unavailable'], opportunities: ['Data unavailable'], catalysts: ['Data unavailable'], chart: [],
   },
-]
-
-const fallbackPortfolio: PortfolioSeed = {
-  positions: ['NVDA', 'MSFT', 'AVGO', 'TSM', 'PLTR', 'ARM', 'GOOG', 'META', 'AMZN', 'INTC', 'QCOM', 'VRT', 'CRWV', 'NVTS', 'ORCL', 'SOUN', 'BA', 'AAPL'].map((symbol) => ({ symbol })),
-}
-
-const ranges = ['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', '5Y', 'MAX']
-const rangeConfig: Record<string, { points: number; label: string; x: string[]; drift: number; volatility: number }> = {
-  '1D': { points: 48, label: 'Intraday · 5 minute bars', x: ['9:30', '11:00', '12:30', '2:00', '4:00'], drift: 0.004, volatility: 0.35 },
-  '5D': { points: 55, label: '5 trading days · hourly bars', x: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], drift: 0.012, volatility: 0.55 },
-  '1M': { points: 64, label: '1 month · daily closes', x: ['Week 1', 'Week 2', 'Week 3', 'Week 4'], drift: 0.028, volatility: 0.85 },
-  '3M': { points: 78, label: '3 months · daily closes', x: ['Month 1', 'Month 2', 'Month 3'], drift: 0.055, volatility: 1.1 },
-  '6M': { points: 96, label: '6 months · daily closes', x: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], drift: 0.09, volatility: 1.35 },
-  YTD: { points: 110, label: 'Year to date · daily closes', x: ['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Now'], drift: 0.12, volatility: 1.5 },
-  '1Y': { points: 126, label: '1 year · daily closes', x: ['Q1', 'Q2', 'Q3', 'Q4', 'Now'], drift: 0.18, volatility: 1.8 },
-  '5Y': { points: 150, label: '5 years · weekly closes', x: ['2022', '2023', '2024', '2025', '2026'], drift: 0.52, volatility: 2.4 },
-  MAX: { points: 170, label: 'Max history · monthly closes', x: ['IPO', 'Early', 'Mid', 'Recent', 'Now'], drift: 0.9, volatility: 3.1 },
-}
-const categories = ['AI & Semiconductors', 'Cloud & Software', 'Consumer Tech', 'Watchlist', 'Long Term Holds']
-const nav = ['▦', '▧', '▤', '▭', '⚙']
-const LIVE_REFRESH_MS = 120_000
-const minCachedChartRows: Record<string, number> = { '1D': 20, '5D': 10, '1M': 15, '3M': 40, '6M': 80, YTD: 20, '1Y': 160, '5Y': 150, MAX: 80 }
-
-const marketInstruments: Stock[] = [
-  { symbol: 'S&P', dataSymbol: '^GSPC', name: 'S&P 500', sector: 'Market Index', price: 5321, change: 0.71, marketCap: 'Index', pe: null, rating: 'Benchmark', confidence: 100, thesis: 'Broad U.S. large-cap market benchmark.', risks: ['Market-wide risk', 'Rate sensitivity'], opportunities: ['Broad equity exposure', 'Risk appetite proxy'], catalysts: ['Fed commentary', 'Earnings breadth', 'Index flows'], chart: [5260, 5284, 5273, 5302, 5321], volume: undefined, dataSource: 'static' },
-  { symbol: 'NASDAQ', dataSymbol: '^IXIC', name: 'Nasdaq Composite', sector: 'Market Index', price: 18204, change: 1.04, marketCap: 'Index', pe: null, rating: 'Tech Beta', confidence: 100, thesis: 'Growth and technology-heavy market benchmark.', risks: ['High-duration tech sensitivity', 'AI trade crowding'], opportunities: ['AI/software leadership', 'Liquidity-driven rallies'], catalysts: ['Mega-cap earnings', 'Semiconductor demand', 'Rate moves'], chart: [17960, 18084, 18020, 18144, 18204], dataSource: 'static' },
-  { symbol: 'DOW', dataSymbol: '^DJI', name: 'Dow Jones Industrial Average', sector: 'Market Index', price: 39872, change: 0.34, marketCap: 'Index', pe: null, rating: 'Cyclical', confidence: 100, thesis: 'Blue-chip industrial and value-oriented market gauge.', risks: ['Industrial slowdown', 'Defensive rotation'], opportunities: ['Value catch-up', 'Dividend stability'], catalysts: ['Industrial data', 'Bank/healthcare moves'], chart: [39680, 39720, 39695, 39810, 39872], dataSource: 'static' },
-  { symbol: 'VIX', dataSymbol: '^VIX', name: 'CBOE Volatility Index', sector: 'Volatility', price: 12.48, change: -4.32, marketCap: 'Volatility', pe: null, rating: 'Fear Gauge', confidence: 100, thesis: 'Options-market stress gauge; lower usually means calmer equity conditions.', risks: ['Sudden risk-off spike', 'Event volatility'], opportunities: ['Calm-market confirmation', 'Hedge timing signal'], catalysts: ['Macro shocks', 'Fed surprises', 'Earnings events'], chart: [13.5, 13.1, 12.9, 12.7, 12.48], dataSource: 'static' },
-  { symbol: '10Y', dataSymbol: '^TNX', name: 'U.S. 10-Year Treasury Yield', sector: 'Rates', price: 4.21, change: -0.06, marketCap: 'Yield', pe: null, rating: 'Rates', confidence: 100, thesis: 'The key long-rate signal for growth stock pressure and valuation appetite.', risks: ['Higher yields pressure tech', 'Inflation surprise'], opportunities: ['Lower yields support growth stocks', 'Policy easing signal'], catalysts: ['CPI/PCE', 'Fed speeches', 'Treasury auctions'], chart: [4.28, 4.25, 4.24, 4.22, 4.21], dataSource: 'static' },
-  { symbol: 'DXY', dataSymbol: 'DX-Y.NYB', name: 'U.S. Dollar Index', sector: 'Currency', price: 103.2, change: -0.18, marketCap: 'FX Index', pe: null, rating: 'Dollar', confidence: 100, thesis: 'Dollar strength/weakness proxy for global liquidity and multinational earnings translation.', risks: ['Dollar spike tightens conditions', 'FX translation drag'], opportunities: ['Weaker dollar can help risk assets', 'Global revenue translation support'], catalysts: ['Rate differentials', 'Global growth data'], chart: [103.8, 103.6, 103.4, 103.3, 103.2], dataSource: 'static' },
-  { symbol: 'BTC', dataSymbol: 'BTC-USD', name: 'Bitcoin', sector: 'Crypto', price: 91400, change: 2.12, marketCap: 'Crypto', pe: null, rating: 'Risk Appetite', confidence: 100, thesis: 'High-beta liquidity and risk-appetite signal.', risks: ['Crypto volatility', 'Regulatory shock'], opportunities: ['Liquidity expansion signal', 'Institutional flow'], catalysts: ['ETF flows', 'Dollar/yield moves'], chart: [88400, 89500, 90200, 90850, 91400], dataSource: 'static' },
-  { symbol: 'WTI', dataSymbol: 'CL=F', name: 'WTI Crude Oil', sector: 'Commodities', price: 78.2, change: 0.42, marketCap: 'Commodity', pe: null, rating: 'Inflation Input', confidence: 100, thesis: 'Oil price signal for inflation pressure and energy/geopolitical risk.', risks: ['Inflation pressure', 'Supply shock'], opportunities: ['Demand strength signal', 'Energy-sector support'], catalysts: ['OPEC', 'Inventory data', 'Geopolitics'], chart: [77.4, 77.9, 77.6, 78.0, 78.2], dataSource: 'static' },
-  { symbol: 'GOLD', dataSymbol: 'GC=F', name: 'Gold Futures', sector: 'Commodities', price: 2381, change: -0.22, marketCap: 'Commodity', pe: null, rating: 'Hedge', confidence: 100, thesis: 'Safe-haven and real-rate sensitivity signal.', risks: ['Real yields rising', 'Dollar strength'], opportunities: ['Hedge demand', 'Lower-rate support'], catalysts: ['Real yields', 'Central-bank buying', 'Geopolitical risk'], chart: [2390, 2388, 2384, 2386, 2381], dataSource: 'static' },
 ]
 
 function sparkPath(values: number[], width = 96, height = 34) {
@@ -82,7 +72,7 @@ function sparkPath(values: number[], width = 96, height = 34) {
   const max = Math.max(...values)
   const points = values.map((value, index) => {
     const x = (index / Math.max(values.length - 1, 1)) * width
-    const y = height - ((value - min) / Math.max(max - min, 1)) * height
+    const y = height - ((value - min) / Math.max(max - min, 1e-9)) * height
     return { x, y }
   })
   if (points.length < 2) return ''
@@ -98,18 +88,26 @@ function money(value: number, digits = 2) {
   return value.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })
 }
 
-function compactMoney(value?: number | null) {
-  return Number.isFinite(Number(value)) ? `$${money(Number(value))}` : '—'
+function bigNumber(value: number) {
+  return value >= 1000 ? value.toLocaleString(undefined, { maximumFractionDigits: 0 }) : money(value)
 }
 
-function targetUpside(stock: Stock) {
-  if (!stock.targetPrice || !stock.price) return '—'
-  const upside = ((stock.targetPrice - stock.price) / stock.price) * 100
-  return `${upside >= 0 ? '+' : ''}${upside.toFixed(1)}%`
+function fmtShares(value?: number | null) {
+  if (!Number.isFinite(Number(value)) || !value) return '—'
+  if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`
+  if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`
+  if (value >= 1e3) return `${(value / 1e3).toFixed(0)}K`
+  return String(Math.round(value))
 }
 
-function sourceLabel(source?: Stock['dataSource']) {
-  return source === 'live' ? 'Live quote' : source === 'stockbot' ? 'StockBot' : 'Static'
+function changeAmount(stock: Stock) {
+  return stock.changeAmount ?? (stock.prevClose ? stock.price - stock.prevClose : (stock.price * stock.change) / 100)
+}
+
+function pctIn52w(stock: Stock) {
+  const [lo, hi] = stock.range52w || [0, 0]
+  if (!lo || !hi || hi <= lo) return null
+  return Math.round(((stock.price - lo) / (hi - lo)) * 100)
 }
 
 function setupLabel(stock: Stock) {
@@ -132,20 +130,14 @@ function actionPosture(stock: Stock) {
   return 'Monitor for catalyst confirmation'
 }
 
-function expandedSeries(stock: Stock, range: string) {
-  const config = rangeConfig[range] || rangeConfig['1D']
-  const source = stock.chart.length > 1 ? stock.chart : [stock.price * 0.98, stock.price]
-  const last = stock.price || source.at(-1) || 1
-  const sourceLast = source.at(-1) || last
-  return Array.from({ length: config.points }, (_, index) => {
-    const t = index / Math.max(config.points - 1, 1)
-    const sourceIndex = Math.min(source.length - 1, Math.round(t * (source.length - 1)))
-    const sourceMove = ((source[sourceIndex] || sourceLast) - sourceLast) / Math.max(sourceLast, 1)
-    const wave = Math.sin(index * 0.72 + stock.symbol.charCodeAt(0)) * 0.006 + Math.cos(index * 0.19 + stock.symbol.length) * 0.004
-    const historicalDiscount = config.drift * (1 - t) * (stock.confidence >= 70 ? 1 : 0.55)
-    const value = last * (1 + sourceMove * config.volatility + wave - historicalDiscount)
-    return Number((index === config.points - 1 ? last : Math.max(value, last * 0.12)).toFixed(2))
-  })
+// US regular session approximation (client-side, no holiday table — the data
+// freshness chip is the authoritative signal).
+function isMarketSession(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(date)
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || ''
+  if (get('weekday') === 'Sat' || get('weekday') === 'Sun') return false
+  const minutes = Number(get('hour')) * 60 + Number(get('minute'))
+  return minutes >= 9 * 60 + 30 && minutes <= 16 * 60
 }
 
 function movingAverage(values: number[], windowSize = 8) {
@@ -156,78 +148,32 @@ function movingAverage(values: number[], windowSize = 8) {
   })
 }
 
-function buildHiDpiChartData(stock: Stock, range: string) {
-  const series = expandedSeries(stock, range)
-  const config = rangeConfig[range] || rangeConfig['1D']
-  const start = new Date()
-  start.setDate(start.getDate() - config.points)
-  const rows = series.map((close, index) => {
-    const date = new Date(start)
-    date.setDate(start.getDate() + index)
-    const open = index === 0 ? close : series[index - 1]
-    const spread = Math.max(Math.abs(close - open) * 0.75, close * 0.003)
-    const high = Math.max(open, close) + spread * (0.8 + (index % 5) * 0.08)
-    const low = Math.min(open, close) - spread * (0.72 + (index % 4) * 0.07)
-    const time = date.toISOString().slice(0, 10) as Time
-    return {
-      time,
-      open: Number(open.toFixed(2)),
-      high: Number(high.toFixed(2)),
-      low: Number(low.toFixed(2)),
-      close: Number(close.toFixed(2)),
-      value: Number(close.toFixed(2)),
-      volume: Math.round(600_000 + Math.abs(close - open) * 140_000 + (index % 9) * 85_000),
-    }
-  })
-  return rows
+function inflate(bars: CompactBar[]): ChartRow[] {
+  return bars.map(([time, open, high, low, close, volume]) => ({ time: time as Time, open, high, low, close, volume }))
 }
 
-const yahooRangeMap: Record<string, { range: string; interval: string }> = {
-  '1D': { range: '1d', interval: '5m' },
-  '5D': { range: '5d', interval: '30m' },
-  '1M': { range: '1mo', interval: '1d' },
-  '3M': { range: '3mo', interval: '1d' },
-  '6M': { range: '6mo', interval: '1d' },
-  YTD: { range: 'ytd', interval: '1d' },
-  '1Y': { range: '1y', interval: '1d' },
-  '5Y': { range: '5y', interval: '1wk' },
-  MAX: { range: 'max', interval: '1mo' },
-}
-
-async function fetchYahooHistory(symbol: string, range: string): Promise<ChartRow[] | null> {
-  const config = yahooRangeMap[range] || yahooRangeMap['1D']
-  const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 10_000)
-  try {
-    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${config.range}&interval=${config.interval}`, { signal: controller.signal })
-    if (!response.ok) return null
-    const payload = await response.json()
-    const result = payload?.chart?.result?.[0]
-    const timestamps = result?.timestamp as number[] | undefined
-    const quote = result?.indicators?.quote?.[0]
-    if (!timestamps?.length || !quote) return null
-    const rows = timestamps.map((stamp, index) => {
-      const open = Number(quote.open?.[index])
-      const high = Number(quote.high?.[index])
-      const low = Number(quote.low?.[index])
-      const close = Number(quote.close?.[index])
-      const volume = Number(quote.volume?.[index] || 0)
-      if (![open, high, low, close].every(Number.isFinite) || close <= 0 || high <= 0 || low <= 0 || open <= 0) return null
-      const date = new Date(stamp * 1000)
-      const time = range === '1D'
-        ? Math.floor(stamp) as Time
-        : date.toISOString().slice(0, 10) as Time
-      return { time, open: Number(open.toFixed(2)), high: Number(high.toFixed(2)), low: Number(low.toFixed(2)), close: Number(close.toFixed(2)), value: Number(close.toFixed(2)), volume }
-    }).filter(Boolean) as ChartRow[]
-    return rows.length > 1 ? rows : null
-  } catch {
-    return null
-  } finally {
-    window.clearTimeout(timeout)
+function rowsForRange(history: HistoryPayload | null, stock: Stock, range: string): ChartRow[] | null {
+  const series = history?.symbols?.[stock.dataSymbol || stock.symbol]
+  if (!series) return null
+  let rows: ChartRow[] | null = null
+  if (range === '1D' && series.i1d) rows = inflate(series.i1d)
+  else if (range === '5D' && series.i5d) rows = inflate(series.i5d)
+  else if (range === '5Y' && series.w5y) rows = inflate(series.w5y)
+  else if (range === 'MAX' && series.mmax) rows = inflate(series.mmax)
+  else if (series.d1y) {
+    const daily = inflate(series.d1y)
+    if (range === '1M') rows = daily.slice(-22)
+    else if (range === '3M') rows = daily.slice(-64)
+    else if (range === '6M') rows = daily.slice(-128)
+    else if (range === 'YTD') {
+      const jan1 = `${new Date().getFullYear()}-01-01`
+      rows = daily.filter((row) => String(row.time) >= jan1)
+    } else if (range === '1Y') rows = daily
   }
+  return rows && rows.length >= 2 ? rows : null
 }
 
-function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMode: ChartMode; indicators: boolean; range: string; stock: Stock }) {
+function HistoryChart({ chartMode, history, indicators, range, stock }: { chartMode: ChartMode; history: HistoryPayload | null; indicators: boolean; range: string; stock: Stock }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const areaRef = useRef<ISeriesApi<'Area'> | null>(null)
@@ -235,12 +181,12 @@ function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMod
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const maRef = useRef<ISeriesApi<'Area'> | null>(null)
   const [hover, setHover] = useState<{ open: number; high: number; low: number; close: number } | null>(null)
-  const [rows, setRows] = useState<ChartRow[]>(() => buildHiDpiChartData(stock, range))
-  const [source, setSource] = useState<'cached' | 'live' | 'fallback'>('fallback')
-  const historyRef = useRef<HistoryPayload | null>(null)
+
+  const rows = useMemo(() => rowsForRange(history, stock, range), [history, range, stock])
+  const hasVolume = useMemo(() => (rows || []).some((row) => row.volume > 0), [rows])
 
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!containerRef.current || !rows) return
     const chart = createChart(containerRef.current, {
       autoSize: true,
       layout: { background: { color: 'transparent' }, textColor: '#8aa0bd', fontSize: 11 },
@@ -264,38 +210,16 @@ function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMod
     candleRef.current = candles
     volumeRef.current = volume
     maRef.current = ma
-    return () => chart.remove()
-  }, [range])
-
-  useEffect(() => {
-    let cancelled = false
-    async function loadHistory() {
-      if (!historyRef.current) {
-        historyRef.current = await fetch(`${import.meta.env.BASE_URL}data/history.json`).then((r) => r.json()).catch(() => null)
-      }
-      const chartSymbol = stock.dataSymbol || stock.symbol
-      const cached = historyRef.current?.stocks?.[chartSymbol]?.[range]
-      if (cancelled) return
-      if (cached && cached.length >= (minCachedChartRows[range] || 2)) {
-        setRows(cached.map((row) => ({ ...row, value: row.close })))
-        setSource('cached')
-        return
-      }
-      const history = await fetchYahooHistory(chartSymbol, range)
-      if (cancelled) return
-      if (history?.length) {
-        setRows(history)
-        setSource('live')
-        return
-      }
-      setRows(buildHiDpiChartData(stock, range))
-      setSource('fallback')
+    return () => {
+      chart.remove()
+      chartRef.current = null
     }
-    loadHistory()
-    return () => { cancelled = true }
-  }, [range, stock])
+    // rows is checked only for existence here; data updates happen below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range, !rows])
 
   useEffect(() => {
+    if (!rows || !chartRef.current) return
     const areaData = rows.map((row) => ({ time: row.time, value: row.close }))
     const volumeData = rows.map((row) => ({ time: row.time, value: row.volume, color: row.close >= row.open ? 'rgba(64,217,130,.28)' : 'rgba(240,82,104,.28)' }))
     const maData = movingAverage(rows.map((row) => row.close), range === '1D' ? 8 : 14).map((value, index) => ({ time: rows[index].time, value }))
@@ -305,97 +229,95 @@ function HighResolutionChart({ chartMode, indicators, range, stock }: { chartMod
     maRef.current?.setData(maData)
     areaRef.current?.applyOptions({ visible: chartMode === 'Line' })
     candleRef.current?.applyOptions({ visible: chartMode === 'Candles' })
-    volumeRef.current?.applyOptions({ visible: chartMode === 'Candles' || chartMode === 'Volume' })
+    volumeRef.current?.applyOptions({ visible: hasVolume && (chartMode === 'Candles' || chartMode === 'Volume') })
     maRef.current?.applyOptions({ visible: indicators && chartMode !== 'Volume' })
-    chartRef.current?.timeScale().fitContent()
-  }, [chartMode, indicators, range, rows])
+    chartRef.current.timeScale().fitContent()
+  }, [chartMode, hasVolume, indicators, range, rows])
 
-  return <div className="hires-chart"><div className="real-chart" ref={containerRef} />{hover && chartMode === 'Candles' && <div className="ohlc-readout"><span>O <b>${money(hover.open)}</b></span><span>H <b>${money(hover.high)}</b></span><span>L <b>${money(hover.low)}</b></span><span>C <b>${money(hover.close)}</b></span></div>}<div className={`chart-source ${source}`}>{source === 'cached' ? 'StockBot cached history' : source === 'live' ? 'Yahoo live history' : 'Fallback history'}</div></div>
+  if (!rows) {
+    return <div className="hires-chart"><div className="chart-empty">No chart history available for {stock.symbol} ({range}).<br /><small>History refreshes with the next scheduled data update.</small></div></div>
+  }
+  return (
+    <div className="hires-chart">
+      <div className="real-chart" ref={containerRef} />
+      {hover && chartMode === 'Candles' && <div className="ohlc-readout"><span>O <b>{money(hover.open)}</b></span><span>H <b>{money(hover.high)}</b></span><span>L <b>{money(hover.low)}</b></span><span>C <b>{money(hover.close)}</b></span></div>}
+      {history && <div className="chart-source live">Yahoo OHLC · {new Date(history.updatedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>}
+    </div>
+  )
 }
 
-async function fetchYahooQuote(symbol: string, expectedPrice?: number): Promise<Partial<Stock> | null> {
-  const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 8_000)
+function readJson<T>(key: string, fallback: T): T {
   try {
-    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=5m`, { signal: controller.signal })
-    if (!response.ok) return null
-    const payload = await response.json()
-    const result = payload?.chart?.result?.[0]
-    const meta = result?.meta
-    const quote = result?.indicators?.quote?.[0]
-    const closes = (quote?.close || []).filter((value: number | null) => typeof value === 'number' && value > 0) as number[]
-    if (!meta || !closes.length) return null
-    const price = Number(meta.regularMarketPrice ?? closes.at(-1))
-    const previous = Number(meta.chartPreviousClose ?? closes[0])
-    if (!Number.isFinite(price) || !Number.isFinite(previous) || previous === 0) return null
-    if (expectedPrice && Math.abs(price - expectedPrice) / Math.max(expectedPrice, 1) > 0.35) return null
-    const volume = (quote?.volume || []).filter((value: number | null) => typeof value === 'number').reduce((sum: number, value: number) => sum + value, 0) / 1_000_000
-    return {
-      price: Number(price.toFixed(2)),
-      change: Number((((price - previous) / previous) * 100).toFixed(2)),
-      chart: closes.slice(-48).map((value) => Number(value.toFixed(2))),
-      volume: Number(volume.toFixed(2)),
-      dataSource: 'live',
-    }
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : fallback
   } catch {
-    return null
-  } finally {
-    window.clearTimeout(timeout)
+    return fallback
   }
 }
 
 function App() {
-  const [stocks, setStocks] = useState<Stock[]>(fallbackStocks)
-  const [portfolio, setPortfolio] = useState<PortfolioSeed>(fallbackPortfolio)
+  const [stocksPayload, setStocksPayload] = useState<StocksPayload | null>(null)
+  const [history, setHistory] = useState<HistoryPayload | null>(null)
+  const [portfolio, setPortfolio] = useState<PortfolioSeed>({ positions: [] })
+  const [holdings, setHoldings] = useState<Record<string, Holding>>(() => readJson('commandCenterHoldings', {}))
+  const [dataStatus, setDataStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedSymbol, setSelectedSymbol] = useState('NVDA')
   const [query, setQuery] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<string>('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('default')
+  const [sortDir, setSortDir] = useState(1)
   const [range, setRange] = useState('1D')
   const [chartMode, setChartMode] = useState<ChartMode>('Candles')
   const [view, setView] = useState<'Research' | 'News' | 'Portfolio'>('Research')
   const [indicators, setIndicators] = useState(true)
-  const [saved, setSaved] = useState<string[]>(() => JSON.parse(localStorage.getItem('savedPortfolioSymbols') || '[]'))
-  const [liveStatus, setLiveStatus] = useState<'loading' | 'live' | 'static'>('loading')
-  const [lastLiveUpdate, setLastLiveUpdate] = useState<string>('')
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [starred, setStarred] = useState<string[]>(() => readJson('savedPortfolioSymbols', []))
   const [detailPanel, setDetailPanel] = useState<DetailPanel>(null)
-  const [focusedCatalyst, setFocusedCatalyst] = useState<string>('')
-  const [marketSnapshots, setMarketSnapshots] = useState<Stock[]>(marketInstruments)
-  const liveSymbolsKey = useMemo(() => stocks.map((stock) => stock.symbol).join('|'), [stocks])
-  const stocksRef = useRef(stocks)
+  const [focusedCatalyst, setFocusedCatalyst] = useState('')
+  const [now, setNow] = useState(() => Date.now())
+  const searchRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    stocksRef.current = stocks
-  }, [stocks])
+    const tick = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => window.clearInterval(tick)
+  }, [])
 
-  useEffect(() => {
-    let cancelled = false
-    async function refreshMarketSnapshots() {
-      const updates = await Promise.allSettled(marketInstruments.map(async (instrument) => {
-        const quote = await fetchYahooQuote(instrument.dataSymbol || instrument.symbol)
-        return quote ? { ...instrument, ...quote, symbol: instrument.symbol, dataSymbol: instrument.dataSymbol, name: instrument.name, sector: instrument.sector } : instrument
-      }))
-      if (cancelled) return
-      setMarketSnapshots(updates.map((result, index) => result.status === 'fulfilled' ? result.value : marketInstruments[index]))
+  const loadData = useCallback(async (bust = false) => {
+    const suffix = bust ? `?t=${Date.now()}` : ''
+    setIsRefreshing(true)
+    try {
+      const [stocksData, portfolioData, historyData] = await Promise.all([
+        fetch(`${import.meta.env.BASE_URL}data/stocks.json${suffix}`).then((r) => r.json() as Promise<StocksPayload>),
+        fetch(`${import.meta.env.BASE_URL}data/portfolio.json${suffix}`).then((r) => r.json() as Promise<PortfolioSeed>).catch(() => null),
+        fetch(`${import.meta.env.BASE_URL}data/history.json${suffix}`).then((r) => r.json() as Promise<HistoryPayload>).catch(() => null),
+      ])
+      if (!Array.isArray(stocksData.stocks)) throw new Error('unexpected stocks.json shape')
+      setStocksPayload(stocksData)
+      if (historyData) setHistory(historyData)
+      const savedPortfolio = readJson<PortfolioSeed | null>('commandCenterPortfolio', null)
+      if (savedPortfolio?.positions?.length) setPortfolio(savedPortfolio)
+      else if (portfolioData?.positions) setPortfolio(portfolioData)
+      setDataStatus('ready')
+    } catch {
+      setDataStatus((current) => (current === 'ready' ? 'ready' : 'error'))
+    } finally {
+      setIsRefreshing(false)
     }
-    refreshMarketSnapshots()
-    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
-    Promise.all([
-      fetch(`${import.meta.env.BASE_URL}data/stocks.json`).then((r) => r.json()).catch(() => ({ stocks: fallbackStocks })),
-      fetch(`${import.meta.env.BASE_URL}data/portfolio.json`).then((r) => r.json()).catch(() => fallbackPortfolio),
-    ]).then(([stockPayload, portfolioData]) => {
-      const stockData = Array.isArray(stockPayload) ? stockPayload : stockPayload.stocks
-      const savedWatch = JSON.parse(localStorage.getItem('commandCenterWatchlist') || '[]') as Stock[]
-      const savedPortfolio = JSON.parse(localStorage.getItem('commandCenterPortfolio') || 'null') as PortfolioSeed | null
-      const merged = [...(stockData || fallbackStocks), ...savedWatch].filter((stock, index, all) => all.findIndex((s) => s.symbol === stock.symbol) === index)
-      setStocks(merged)
-      setPortfolio(savedPortfolio || portfolioData)
-      setSelectedSymbol((current) => merged.some((stock) => stock.symbol === current) ? current : merged[0]?.symbol || 'NVDA')
-    })
-  }, [])
+    const initial = window.setTimeout(() => loadData(), 0)
+    const interval = window.setInterval(() => loadData(true), DATA_REFRESH_MS)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') loadData(true)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.clearTimeout(initial)
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [loadData])
 
   useEffect(() => {
     function syncPanelFromHash() {
@@ -407,81 +329,71 @@ function App() {
     return () => window.removeEventListener('hashchange', syncPanelFromHash)
   }, [])
 
-  useEffect(() => {
-    let cancelled = false
-    async function refreshLivePrices() {
-      const liveStocks = stocksRef.current.filter((stock) => liveSymbolsKey.split('|').includes(stock.symbol))
-      const symbols = liveStocks.map((stock) => stock.symbol)
-      if (!symbols.length) return
-      const updates = await Promise.allSettled(liveStocks.map((stock) => fetchYahooQuote(stock.symbol, stock.price)))
-      if (cancelled) return
-      const updateMap = new Map<string, Partial<Stock>>()
-      updates.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value) updateMap.set(symbols[index], result.value)
-      })
-      if (!updateMap.size) {
-        setLiveStatus('static')
-        return
-      }
-      setStocks((current) => current.map((stock) => updateMap.has(stock.symbol) ? { ...stock, ...updateMap.get(stock.symbol) } : stock))
-      setLiveStatus('live')
-      setLastLiveUpdate(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-    }
-    refreshLivePrices()
-    const interval = window.setInterval(refreshLivePrices, LIVE_REFRESH_MS)
-    return () => {
-      cancelled = true
-      window.clearInterval(interval)
-    }
-  }, [liveSymbolsKey])
+  const allInstruments = useMemo(() => stocksPayload?.stocks || fallbackStocks, [stocksPayload])
+  const stocks = useMemo(() => allInstruments.filter((stock) => (stock.kind || 'equity') === 'equity'), [allInstruments])
+  const marketSnapshots = useMemo(() => allInstruments.filter((stock) => stock.kind === 'instrument'), [allInstruments])
+  const selected = allInstruments.find((stock) => stock.symbol === selectedSymbol) || stocks[0] || fallbackStocks[0]
+  const isMarketSelection = selected.kind === 'instrument'
 
-  async function refreshPricesNow() {
-    const liveStocks = stocks.filter((stock) => liveSymbolsKey.split('|').includes(stock.symbol))
-    const symbols = liveStocks.map((stock) => stock.symbol)
-    if (!symbols.length || isRefreshing) return
-    setIsRefreshing(true)
-    setLiveStatus('loading')
-    const updates = await Promise.allSettled(liveStocks.map((stock) => fetchYahooQuote(stock.symbol, stock.price)))
-    const updateMap = new Map<string, Partial<Stock>>()
-    updates.forEach((result, index) => {
-      if (result.status === 'fulfilled' && result.value) updateMap.set(symbols[index], result.value)
+  const categories = useMemo(() => {
+    const defs: { name: string; member: (stock: Stock) => boolean }[] = [
+      { name: 'AI & Semiconductors', member: (s) => s.sector.includes('Semi') || ['NVDA', 'AVGO', 'ARM', 'TSM', 'QCOM', 'INTC', 'NVTS'].includes(s.symbol) },
+      { name: 'Cloud & Software', member: (s) => s.sector.includes('Cloud') || s.sector.includes('Software') || ['MSFT', 'ORCL', 'PLTR', 'GOOG', 'AMZN', 'CRWV', 'SOUN'].includes(s.symbol) },
+      { name: 'Consumer Tech', member: (s) => ['AAPL', 'AMZN', 'GOOG', 'META'].includes(s.symbol) },
+      { name: 'Portfolio', member: (s) => portfolio.positions.some((p) => p.symbol === s.symbol) },
+      { name: '★ Starred', member: (s) => starred.includes(s.symbol) },
+    ]
+    return defs.map(({ name, member }) => ({ name, member, count: stocks.filter(member).length }))
+  }, [portfolio.positions, starred, stocks])
+
+  const filtered = useMemo(() => {
+    const active = categories.find((category) => category.name === categoryFilter)
+    let list = stocks.filter((stock) => {
+      const matchesQuery = `${stock.symbol} ${stock.name}`.toLowerCase().includes(query.toLowerCase())
+      return matchesQuery && (!active || active.member(stock))
     })
-    if (updateMap.size) {
-      setStocks((current) => current.map((stock) => updateMap.has(stock.symbol) ? { ...stock, ...updateMap.get(stock.symbol) } : stock))
-      setLiveStatus('live')
-      setLastLiveUpdate(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-    } else {
-      setLiveStatus('static')
+    if (sortKey !== 'default') {
+      list = [...list].sort((a, b) => {
+        if (sortKey === 'symbol') return a.symbol.localeCompare(b.symbol) * sortDir
+        if (sortKey === 'price') return (a.price - b.price) * sortDir
+        return (a.change - b.change) * sortDir
+      })
     }
-    setIsRefreshing(false)
-  }
+    return list
+  }, [categories, categoryFilter, query, sortDir, sortKey, stocks])
 
-  const allInstruments = useMemo(() => [...stocks, ...marketSnapshots], [marketSnapshots, stocks])
-  const selected = allInstruments.find((stock) => stock.symbol === selectedSymbol) || stocks[0]
-  const isMarketSelection = marketSnapshots.some((item) => item.symbol === selected.symbol)
-  const filtered = useMemo(() => stocks.filter((stock) => {
-    const matchesQuery = `${stock.symbol} ${stock.name}`.toLowerCase().includes(query.toLowerCase())
-    const matchesCategory = !categoryFilter
-      || (categoryFilter === 'AI & Semiconductors' && (stock.sector.includes('Semi') || ['NVDA', 'AVGO', 'ARM', 'TSM', 'QCOM', 'INTC', 'NVTS'].includes(stock.symbol)))
-      || (categoryFilter === 'Cloud & Software' && (stock.sector.includes('Cloud') || stock.sector.includes('Software') || ['MSFT', 'ORCL', 'PLTR', 'GOOG', 'AMZN'].includes(stock.symbol)))
-      || (categoryFilter === 'Consumer Tech' && ['AAPL', 'AMZN', 'GOOG', 'META'].includes(stock.symbol))
-      || (categoryFilter === 'Watchlist' && portfolio.positions.some((position) => position.symbol === stock.symbol))
-      || (categoryFilter === 'Long Term Holds' && ['NVDA', 'MSFT', 'AVGO', 'TSM', 'GOOG', 'META', 'AMZN', 'AAPL'].includes(stock.symbol))
-    return matchesQuery && matchesCategory
-  }), [categoryFilter, portfolio.positions, query, stocks])
-  const positions = portfolio.positions.map((position) => ({ ...position, stock: stocks.find((stock) => stock.symbol === position.symbol) })).filter((p) => p.stock)
+  const positions = useMemo(() => portfolio.positions
+    .map((position) => ({ ...position, stock: stocks.find((stock) => stock.symbol === position.symbol) }))
+    .filter((position): position is { symbol: string; stock: Stock } => Boolean(position.stock)), [portfolio.positions, stocks])
+
+  const plSummary = useMemo(() => {
+    let value = 0
+    let cost = 0
+    let dayPl = 0
+    let held = 0
+    for (const position of positions) {
+      const holding = holdings[position.symbol]
+      if (!holding || !(holding.shares > 0)) continue
+      held += 1
+      value += holding.shares * position.stock.price
+      cost += holding.shares * holding.avgCost
+      dayPl += holding.shares * changeAmount(position.stock)
+    }
+    return { value, cost, dayPl, held, totalPl: value - cost, totalPlPct: cost > 0 ? ((value - cost) / cost) * 100 : 0 }
+  }, [holdings, positions])
+
   const grouped = stocks.reduce<Record<string, Stock[]>>((acc, stock) => {
-    const key = stock.sector.includes('Semi') ? 'Semiconductors' : stock.sector.includes('Cloud') || stock.sector.includes('Software') ? 'Software' : stock.sector.includes('Consumer') ? 'Consumer Electronics' : stock.sector.includes('Communication') ? 'Consumer / Internet' : stock.sector.includes('Industrial') ? 'Industrials' : stock.sector
+    const key = stock.sector.includes('Semi') ? 'Semiconductors' : stock.sector.includes('Cloud') || stock.sector.includes('Software') ? 'Software' : stock.sector.includes('Consumer') ? 'Consumer Tech' : stock.sector.includes('Communication') ? 'Consumer / Internet' : stock.sector.includes('Industrial') ? 'Industrials' : stock.sector
     acc[key] = [...(acc[key] || []), stock]
     return acc
   }, {})
-  const sectorBoard = ['Semiconductors', 'Software', 'Consumer / Internet', 'Consumer Electronics', 'Industrials']
-    .map((group) => ({ group, items: grouped[group] || [] }))
-    .filter(({ items }) => items.length)
+  const sectorBoard = Object.entries(grouped).map(([group, items]) => ({ group, items })).filter(({ items }) => items.length)
+
   const movers = [...stocks]
     .filter((stock) => Number.isFinite(stock.change) && Number.isFinite(stock.price))
     .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
     .slice(0, 8)
+
   const catalystRadar = [
     { label: 'Now', type: 'Primary', text: selected.catalysts[0] || selected.thesis, tone: selected.change >= 0 ? 'up' : 'down' },
     { label: 'Next', type: 'Bull trigger', text: selected.catalysts[1] || selected.opportunities[0] || 'Watch for confirmation in the next major update.', tone: 'up' },
@@ -500,71 +412,68 @@ function App() {
     { label: 'Breaks it', value: 'Risk case', text: selected.risks[0] || 'No explicit break point recorded yet.', tone: 'down' },
     { label: 'Posture', value: actionPosture(selected), text: actionPosture(selected), tone: selected.change >= 0 ? 'up' : 'neutral' },
   ]
-  const visibleWatchlist = query || categoryFilter ? filtered : stocks
-  const hiddenWatchlistCount = query || categoryFilter ? 0 : Math.max(0, stocks.length - visibleWatchlist.length)
-  const inPortfolio = saved.includes(selected.symbol)
+
+  const isStarred = starred.includes(selected.symbol)
+  const marketOpen = isMarketSession(new Date(now))
+  const dataAgeMinutes = stocksPayload ? Math.max(0, Math.round((now - new Date(stocksPayload.updatedAt).getTime()) / 60000)) : null
+  const dataStale = marketOpen && dataAgeMinutes !== null && dataAgeMinutes > 45
+  const dataChipLabel = dataStatus === 'loading' ? 'Loading market data…'
+    : dataStatus === 'error' ? 'Data files unavailable'
+    : `Data as of ${new Date(stocksPayload!.updatedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}${dataStale ? ' · stale' : ''}`
+
   const marketStrip = marketSnapshots.map((item) => ({
     ...item,
-    value: item.symbol === '10Y' ? `${item.price.toFixed(2)}%` : item.price >= 1000 ? item.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : money(item.price),
+    value: item.sector === 'Rates' ? `${item.price.toFixed(2)}%` : bigNumber(item.price),
   }))
-  const marketSummary = marketSnapshots[0] || marketInstruments[0]
+  const marketSummary = marketSnapshots[0]
   const marketBreadth = {
-    advancing: stocks.filter((stock) => stock.change >= 0).length,
+    advancing: stocks.filter((stock) => stock.change > 0).length,
     declining: stocks.filter((stock) => stock.change < 0).length,
     unchanged: stocks.filter((stock) => stock.change === 0).length,
   }
+  const breadthTotal = Math.max(1, marketBreadth.advancing + marketBreadth.declining + marketBreadth.unchanged)
   const peerUniverse = isMarketSelection ? marketSnapshots : stocks
   const peerRows = [...peerUniverse]
     .filter((stock) => stock.sector === selected.sector || stock.symbol === selected.symbol)
     .sort((a, b) => (b.confidence - a.confidence) || (b.change - a.change))
     .slice(0, 10)
-  const chartSeries = useMemo(() => expandedSeries(selected, range), [range, selected])
-  const chartChange = chartSeries.length > 1 ? ((chartSeries.at(-1)! - chartSeries[0]) / chartSeries[0]) * 100 : 0
-  const activeRange = rangeConfig[range] || rangeConfig['1D']
+  const chartRows = useMemo(() => rowsForRange(history, selected, range), [history, range, selected])
+  const chartChange = chartRows && chartRows.length > 1 ? ((chartRows.at(-1)!.close - chartRows[0].close) / chartRows[0].close) * 100 : null
 
-  function addTicker() {
-    const raw = query.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5)
-    if (!raw) return
-    const existing = stocks.find((stock) => stock.symbol === raw)
-    if (existing) {
-      setSelectedSymbol(existing.symbol)
+  const statusInstruments = marketSnapshots.filter((item) => ['S&P', 'NASDAQ', 'VIX', '10Y'].includes(item.symbol))
+
+  function searchEnter() {
+    if (filtered.length) {
+      setSelectedSymbol(filtered[0].symbol)
       setQuery('')
-      return
     }
-    const generated: Stock = {
-      symbol: raw,
-      name: `${raw} Research Candidate`,
-      sector: 'Watchlist',
-      price: Number((40 + Math.random() * 240).toFixed(2)),
-      change: Number((Math.random() * 8 - 4).toFixed(2)),
-      marketCap: 'Research',
-      pe: null,
-      confidence: 62,
-      thesis: 'Newly added research candidate. It is saved locally and ready for notes, portfolio tracking, and API enrichment.',
-      risks: ['Needs real financial data', 'Unknown valuation setup', 'No catalyst history yet'],
-      opportunities: ['Fresh research target', 'Can be promoted into portfolio tracking', 'Add notes and API enrichment later'],
-      catalysts: ['User-added ticker', 'Awaiting data provider connection', 'Research queue item'],
-      chart: Array.from({ length: 24 }, (_, i) => 60 + i * 1.5 + Math.sin(i) * 8),
-      volume: 12,
-    }
-    const next = [...stocks, generated]
-    setStocks(next)
-    setSelectedSymbol(raw)
-    localStorage.setItem('commandCenterWatchlist', JSON.stringify(next.filter((stock) => !fallbackStocks.some((seed) => seed.symbol === stock.symbol))))
-    setQuery('')
   }
 
-  function toggleSave() {
-    const next = inPortfolio ? saved.filter((symbol) => symbol !== selected.symbol) : [...saved, selected.symbol]
-    setSaved(next)
+  function toggleStar() {
+    const next = isStarred ? starred.filter((symbol) => symbol !== selected.symbol) : [...starred, selected.symbol]
+    setStarred(next)
     localStorage.setItem('savedPortfolioSymbols', JSON.stringify(next))
   }
 
-  function addSelectedHolding() {
-    if (portfolio.positions.some((position) => position.symbol === selected.symbol)) return
-    const next = { ...portfolio, positions: [...portfolio.positions, { symbol: selected.symbol }] }
+  function savePortfolio(next: PortfolioSeed) {
     setPortfolio(next)
     localStorage.setItem('commandCenterPortfolio', JSON.stringify(next))
+  }
+
+  function addSelectedHolding() {
+    if (isMarketSelection || portfolio.positions.some((position) => position.symbol === selected.symbol)) return
+    savePortfolio({ ...portfolio, positions: [...portfolio.positions, { symbol: selected.symbol }] })
+  }
+
+  function removeHolding(symbol: string) {
+    savePortfolio({ ...portfolio, positions: portfolio.positions.filter((position) => position.symbol !== symbol) })
+  }
+
+  function updateHolding(symbol: string, patch: Partial<Holding>) {
+    const current = holdings[symbol] || { shares: 0, avgCost: 0 }
+    const next = { ...holdings, [symbol]: { ...current, ...patch } }
+    setHoldings(next)
+    localStorage.setItem('commandCenterHoldings', JSON.stringify(next))
   }
 
   function openPanel(panel: Exclude<DetailPanel, null>) {
@@ -581,9 +490,9 @@ function App() {
     openPanel('catalysts')
   }
 
-  function openCatalystArticle(text: string) {
-    const query = encodeURIComponent(`${selected.symbol} ${selected.name} ${text}`)
-    window.open(`https://www.google.com/search?tbm=nws&q=${query}`, '_blank', 'noopener,noreferrer')
+  function openNewsSearch(text: string, stock: Stock = selected) {
+    const newsQuery = encodeURIComponent(`${stock.symbol} ${stock.name} ${text}`)
+    window.open(`https://www.google.com/search?tbm=nws&q=${newsQuery}`, '_blank', 'noopener,noreferrer')
   }
 
   function closePanel() {
@@ -592,114 +501,177 @@ function App() {
   }
 
   function selectCategory(category: string) {
-    setCategoryFilter((current) => current === category ? '' : category)
+    setCategoryFilter((current) => (current === category ? '' : category))
     setQuery('')
-    openPanel('watchlist')
   }
+
+  function sortBy(key: SortKey) {
+    if (sortKey === key) {
+      if (sortDir === 1) setSortDir(-1)
+      else {
+        setSortKey('default')
+        setSortDir(1)
+      }
+    } else {
+      setSortKey(key)
+      setSortDir(1)
+    }
+  }
+
+  const sortMark = (key: SortKey) => (sortKey === key ? (sortDir === 1 ? ' ▲' : ' ▼') : '')
 
   return (
     <main className="terminal">
       <nav className="rail">
         <a className="home-link" href="https://jz237.github.io/jez237-site/?v=3fee6936" title="Back to homepage" aria-label="Back to homepage"><span>⌂</span><b>Home</b></a>
-        {nav.map((item, index) => <button onClick={() => index === 0 ? openPanel('watchlist') : index === 1 ? openPanel('report') : index === 2 ? openCatalysts() : index === 3 ? openPanel('risks') : setView('Portfolio')} className={index === 1 ? 'hot' : ''} key={item}>{item}</button>)}
+        <button title="Watchlist table" onClick={() => openPanel('watchlist')}>▦</button>
+        <button title="Full research report" className="hot" onClick={() => openPanel('report')}>▧</button>
+        <button title="Catalyst workbench" onClick={() => openCatalysts()}>▤</button>
+        <button title="Risks & opportunities" onClick={() => openPanel('risks')}>▭</button>
+        <button title="Portfolio view" onClick={() => setView('Portfolio')}>⚙</button>
       </nav>
 
       <aside className="watch-panel panel">
         <div className="brand"><span className="bars">▰</span><strong>Market Command Center</strong></div>
-        <div className="watch-head"><span>Watchlists</span><button onClick={addTicker}>＋</button><button onClick={() => openPanel('watchlist')}>⋯</button></div>
-        <button onClick={() => openPanel('watchlist')} className="watch-select">★ Tech Leaders <span>⌄</span></button>
-        <div className="watch-labels"><span>Ticker</span><span>Price</span><span>24H %</span></div>
+        <div className="watch-head"><span>Watchlist</span><button title="Search tickers" onClick={() => searchRef.current?.focus()}>⌕</button><button title="Open watchlist table" onClick={() => openPanel('watchlist')}>⋯</button></div>
+        <div className="watch-labels">
+          <button onClick={() => sortBy('symbol')}>Ticker{sortMark('symbol')}</button>
+          <button onClick={() => sortBy('price')}>Price{sortMark('price')}</button>
+          <button onClick={() => sortBy('change')}>24H %{sortMark('change')}</button>
+        </div>
         <div className="watchlist">
-          {visibleWatchlist.map((stock) => (
+          {filtered.map((stock) => (
             <button key={stock.symbol} className={`watch ${stock.symbol === selected.symbol ? 'active' : ''}`} onClick={() => setSelectedSymbol(stock.symbol)}>
-              <strong>{stock.symbol}</strong>
+              <strong>{starred.includes(stock.symbol) ? '★ ' : ''}{stock.symbol}</strong>
               <svg viewBox="0 0 90 28"><path d={sparkPath(stock.chart, 90, 28)} /></svg>
               <span>{money(stock.price)}</span>
               <b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b>
             </button>
           ))}
-          {hiddenWatchlistCount > 0 && <div className="watch-more">+{hiddenWatchlistCount} more tracked names · search to filter</div>}
+          {!filtered.length && <div className="watch-more">No tickers match{query ? ` “${query}”` : ''}{categoryFilter ? ` in ${categoryFilter}` : ''}.</div>}
         </div>
         <div className="folders">
-          {categories.map((category, index) => <button className={categoryFilter === category ? 'active' : ''} onClick={() => selectCategory(category)} key={category}>▸ {category}<b>{[8, 7, 6, positions.length, 8][index]}</b></button>)}
+          {categories.map((category) => <button className={categoryFilter === category.name ? 'active' : ''} onClick={() => selectCategory(category.name)} key={category.name}>▸ {category.name}<b>{category.count}</b></button>)}
         </div>
         <div className="market-status">
-          <span>Market Status <b>● Market Open</b></span>
-          {['SPY', 'QQQ', 'IWM', 'VIX'].map((ticker, index) => <p key={ticker}><em>{ticker}</em><strong>{[532.54, 458.23, 210.17, 12.48][index]}</strong><b className={index === 3 ? 'down' : 'up'}>{index === 3 ? '-4.32%' : '+0.' + (index + 7) + '1%'}</b><svg viewBox="0 0 54 18"><path d="M0 14 L8 12 L15 13 L22 8 L30 10 L38 5 L46 7 L54 3" /></svg></p>)}
+          <span>Market Status <b className={marketOpen ? 'up' : 'down'}>● {marketOpen ? 'Market Open' : 'Market Closed'}</b></span>
+          {statusInstruments.map((item) => (
+            <p key={item.symbol}>
+              <em>{item.symbol}</em>
+              <strong>{item.sector === 'Rates' ? `${item.price.toFixed(2)}%` : bigNumber(item.price)}</strong>
+              <b className={item.change >= 0 ? 'up' : 'down'}>{item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%</b>
+              <svg viewBox="0 0 54 18"><path d={sparkPath(item.chart.slice(-20), 54, 18)} /></svg>
+            </p>
+          ))}
         </div>
       </aside>
 
       <section className="workspace">
         <header className="topbar">
-          <label className="global-search"><span>⌕</span><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTicker()} placeholder="Search company or ticker…" /></label>
-          <div className={`live-chip ${liveStatus}`}><i />{liveStatus === 'live' ? `Live prices ${lastLiveUpdate}` : liveStatus === 'loading' ? 'Connecting live prices' : 'Static fallback data'}<button onClick={refreshPricesNow} disabled={isRefreshing}>{isRefreshing ? 'Refreshing…' : 'Update prices'}</button></div>
+          <label className="global-search"><span>⌕</span><input ref={searchRef} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && searchEnter()} placeholder="Search company or ticker…" /></label>
+          <div className={`live-chip ${dataStatus === 'loading' ? 'loading' : dataStatus === 'error' || dataStale ? 'static' : 'live'}`}><i />{dataChipLabel}<button onClick={() => loadData(true)} disabled={isRefreshing}>{isRefreshing ? 'Refreshing…' : 'Refresh'}</button></div>
           <div className="mode-tabs">{(['Research', 'News', 'Portfolio'] as const).map((tab) => <button className={view === tab ? 'selected' : ''} onClick={() => setView(tab)} key={tab}>▣ {tab}</button>)}</div>
-          <div className="avatar">MC</div>
         </header>
 
         <section className="market-strip panel">
-          {marketStrip.map((item) => <button onClick={() => setSelectedSymbol(item.symbol)} className={selected.symbol === item.symbol ? 'active' : ''} key={item.symbol}><strong>{item.symbol}</strong><span>{item.value}</span><b className={item.change >= 0 ? 'up' : 'down'}>{item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%</b><svg viewBox="0 0 48 14"><path d="M0 10 L7 8 L13 9 L20 5 L27 7 L34 3 L41 5 L48 2" /></svg></button>)}
+          {marketStrip.map((item) => <button onClick={() => setSelectedSymbol(item.symbol)} className={selected.symbol === item.symbol ? 'active' : ''} key={item.symbol}><strong>{item.symbol}</strong><span>{item.value}</span><b className={item.change >= 0 ? 'up' : 'down'}>{item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%</b><svg viewBox="0 0 48 14"><path d={sparkPath(item.chart.slice(-24), 48, 14)} /></svg></button>)}
         </section>
 
         <div className="content-grid">
           <section className="main-stack">
             <section className="chart-panel panel">
               <div className="quote-head">
-                <div><h1>{selected.symbol}</h1><strong>{money(selected.price)}</strong><span className={selected.change >= 0 ? 'up' : 'down'}>{selected.change >= 0 ? '+' : ''}{(selected.price * selected.change / 100).toFixed(2)} ({selected.change.toFixed(2)}%)</span><small className="source">{isMarketSelection ? 'Market benchmark snapshot' : selected.dataSource === 'live' ? 'Yahoo Finance live feed' : 'StockBot cached data'}</small></div>
-                {!isMarketSelection && <button onClick={toggleSave} className="star">★</button>}
+                <div>
+                  <h1>{selected.symbol}</h1>
+                  <strong>{selected.sector === 'Rates' ? `${selected.price.toFixed(2)}%` : money(selected.price)}</strong>
+                  <span className={selected.change >= 0 ? 'up' : 'down'}>{changeAmount(selected) >= 0 ? '+' : ''}{money(changeAmount(selected))} ({selected.change >= 0 ? '+' : ''}{selected.change.toFixed(2)}%)</span>
+                  <small className="source">{selected.name}{selected.exchange ? ` · ${selected.exchange}` : ''}</small>
+                </div>
+                {!isMarketSelection && <button onClick={toggleStar} className={`star ${isStarred ? 'on' : ''}`} title={isStarred ? 'Remove from starred' : 'Add to starred'}>{isStarred ? '★' : '☆'}</button>}
                 <div className="quote-stats">
-                  <span>Market Cap <b>{selected.marketCap}</b></span><span>P/E <b>{selected.pe ? selected.pe.toFixed(2) : '—'}</b></span><span>Rating <b>{selected.rating || 'Watch'}</b></span><span>Volume <b>{selected.volume || '—'}M</b></span><span>52W Range <b>{selected.range52w?.[0] && selected.range52w?.[1] ? `${selected.range52w[0]} - ${selected.range52w[1]}` : '—'}</b></span>
-                  <span>Target <b>{compactMoney(selected.targetPrice)}</b></span><span>Target Gap <b className={selected.targetPrice && selected.targetPrice >= selected.price ? 'up' : 'down'}>{targetUpside(selected)}</b></span><span>Conviction <b>{selected.confidence}/100</b></span><span>Sector <b>{selected.sector}</b></span><span>Source <b>{sourceLabel(selected.dataSource)}</b></span>
+                  <span>Prev Close <b>{selected.prevClose ? money(selected.prevClose) : '—'}</b></span>
+                  <span>Day Range <b>{selected.dayLow && selected.dayHigh ? `${money(selected.dayLow)} – ${money(selected.dayHigh)}` : '—'}</b></span>
+                  <span>52W Range <b>{selected.range52w ? `${money(selected.range52w[0])} – ${money(selected.range52w[1])}` : '—'}</b></span>
+                  <span>52W Position <b>{pctIn52w(selected) !== null ? `${pctIn52w(selected)}%` : '—'}</b></span>
+                  <span>Volume <b>{fmtShares(selected.volume)}</b></span>
+                  <span>Rating <b>{selected.rating || 'Watch'}</b></span>
+                  <span>Conviction <b>{selected.confidence}/100</b></span>
+                  <span>Sector <b>{selected.sector}</b></span>
+                  <span>Currency <b>{selected.currency || 'USD'}</b></span>
+                  <span>Quote Time <b>{selected.quoteUpdatedAt ? new Date(selected.quoteUpdatedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</b></span>
                 </div>
               </div>
-              <div className="rangebar">{ranges.map((item) => <button className={range === item ? 'active' : ''} onClick={() => setRange(item)} key={item}>{item}</button>)}<button onClick={() => setIndicators(!indicators)} className="indicator">⌁ {indicators ? 'SMA on' : 'SMA off'}</button><button onClick={() => openPanel('report')}>⛶</button><button onClick={() => openCatalysts()}>⋯</button></div>
-              <div className="chart-toolbar"><div><strong>{range} performance</strong><span>{activeRange.label}</span></div><div className="chart-modes">{(['Line', 'Candles', 'Volume'] as ChartMode[]).map((mode) => <button className={chartMode === mode ? 'active' : ''} onClick={() => setChartMode(mode)} key={mode}>{mode}</button>)}</div><b className={chartChange >= 0 ? 'up' : 'down'}>{chartChange >= 0 ? '+' : ''}{chartChange.toFixed(2)}%</b></div>
+              <div className="rangebar">{ranges.map((item) => <button className={range === item ? 'active' : ''} onClick={() => setRange(item)} key={item}>{item}</button>)}<button onClick={() => setIndicators(!indicators)} className="indicator">⌁ {indicators ? 'SMA on' : 'SMA off'}</button><button title="Full report" onClick={() => openPanel('report')}>⛶</button><button title="Catalysts" onClick={() => openCatalysts()}>⋯</button></div>
+              <div className="chart-toolbar"><div><strong>{range} performance</strong><span>{rangeLabels[range]}</span></div><div className="chart-modes">{(['Line', 'Candles', 'Volume'] as ChartMode[]).map((mode) => <button className={chartMode === mode ? 'active' : ''} onClick={() => setChartMode(mode)} key={mode}>{mode}</button>)}</div><b className={chartChange === null ? '' : chartChange >= 0 ? 'up' : 'down'}>{chartChange === null ? '—' : `${chartChange >= 0 ? '+' : ''}${chartChange.toFixed(2)}%`}</b></div>
               <div className="chart-wrap">
-                <HighResolutionChart stock={selected} range={range} chartMode={chartMode} indicators={indicators} />
-                <div className="unit-badge">USD / share · high-DPI interactive chart · hover candles for O/H/L/C</div>
+                <HistoryChart stock={selected} range={range} chartMode={chartMode} indicators={indicators} history={history} />
+                <div className="unit-badge">{selected.currency || 'USD'}{isMarketSelection ? '' : ' / share'} · hover candles for O/H/L/C</div>
               </div>
             </section>
 
             <section className="heat-panel panel">
-              {sectorBoard.map(({ group, items }) => <div className="heat-sector" key={group}><span>{group}<b>{items.length}</b></span><div>{items.slice(0, 8).map((stock) => <button onClick={() => setSelectedSymbol(stock.symbol)} className={stock.change >= 0 ? 'gain' : 'loss'} key={stock.symbol}><strong>{stock.symbol}</strong><em>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</em><small>{stock.marketCap}</small></button>)}</div></div>)}
+              {sectorBoard.map(({ group, items }) => <div className="heat-sector" key={group}><span>{group}<b>{items.length}</b></span><div>{items.slice(0, 8).map((stock) => <button onClick={() => setSelectedSymbol(stock.symbol)} className={stock.change >= 0 ? 'gain' : 'loss'} key={stock.symbol}><strong>{stock.symbol}</strong><em>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</em><small>${money(stock.price)}</small></button>)}</div></div>)}
             </section>
 
             <section className="research-deck">
               <article className="panel research-slice readout-slice" onClick={() => openPanel('research')}><div className="card-title">Investment Readout <button>{selected.symbol}</button></div><strong>{setupLabel(selected)}</strong><p>{actionPosture(selected)} · {selected.thesis}</p></article>
-              <article className="panel research-slice catalyst-slice" onClick={() => openCatalysts()}><div className="card-title">Catalysts to Watch</div>{selected.catalysts.slice(0,4).map((item) => <button onClick={(event) => { event.stopPropagation(); openCatalysts(item) }} className="mini-catalyst" key={item}>{item}</button>)}</article>
+              <article className="panel research-slice catalyst-slice" onClick={() => openCatalysts()}><div className="card-title">Catalysts to Watch</div>{selected.catalysts.slice(0, 4).map((item) => <button onClick={(event) => { event.stopPropagation(); openCatalysts(item) }} className="mini-catalyst" key={item}>{item}</button>)}</article>
               <article className="panel research-slice decision-slice"><div className="card-title">Decision Frame <button>{selected.change >= 0 ? 'Constructive' : 'Caution'}</button></div><p><b className="up">Stay interested if:</b> {selected.opportunities[0]}</p><p><b className="down">Reassess if:</b> {selected.risks[0]}</p><small>Next check: {selected.catalysts[0] || 'fresh catalyst update'}</small></article>
             </section>
 
             <section className="panel peer-table">
               <div className="card-title">Peer / Sector Comparison <button onClick={() => { setCategoryFilter(''); openPanel('watchlist') }}>{selected.sector}</button></div>
-              <div className="peer-head"><span>Ticker</span><span>Name</span><span>Last</span><span>%</span><span>Cap</span><span>P/E</span><span>Rating</span><span>Conv.</span><span>Target Gap</span><span>Trend</span></div>
-              {peerRows.map((stock) => <button key={stock.symbol} onClick={() => setSelectedSymbol(stock.symbol)} className={stock.symbol === selected.symbol ? 'active' : ''}><strong>{stock.symbol}</strong><span>{stock.name}</span><span>{stock.sector === 'Rates' ? `${money(stock.price)}%` : `$${money(stock.price)}`}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><span>{stock.marketCap}</span><span>{stock.pe ? stock.pe.toFixed(1) : '—'}</span><span>{stock.rating || 'Watch'}</span><span>{stock.confidence}/100</span><b className={stock.targetPrice && stock.targetPrice >= stock.price ? 'up' : 'down'}>{targetUpside(stock)}</b><svg viewBox="0 0 96 22"><path d={sparkPath(stock.chart, 96, 22)} /></svg></button>)}
+              <div className="peer-head"><span>Ticker</span><span>Name</span><span>Last</span><span>%</span><span>Volume</span><span>52W Pos</span><span>Rating</span><span>Conv.</span><span>Trend</span></div>
+              {peerRows.map((stock) => <button key={stock.symbol} onClick={() => setSelectedSymbol(stock.symbol)} className={stock.symbol === selected.symbol ? 'active' : ''}><strong>{stock.symbol}</strong><span>{stock.name}</span><span>{stock.sector === 'Rates' ? `${money(stock.price)}%` : `$${money(stock.price)}`}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><span>{fmtShares(stock.volume)}</span><span>{pctIn52w(stock) !== null ? `${pctIn52w(stock)}%` : '—'}</span><span>{stock.rating || 'Watch'}</span><span>{stock.confidence}/100</span><svg viewBox="0 0 96 22"><path d={sparkPath(stock.chart, 96, 22)} /></svg></button>)}
             </section>
 
             <section className="bottom-grid movers-grid">
-              <div className="panel movers"><div className="card-title">Today’s Top Movers <button>{liveStatus === 'live' ? `Live ${lastLiveUpdate}` : 'Cached'}</button></div>{movers.map((stock) => <button onClick={() => setSelectedSymbol(stock.symbol)} key={stock.symbol}><strong>{stock.symbol}</strong><svg viewBox="0 0 96 24"><path d={sparkPath(stock.chart, 96, 24)} /></svg><span>{stock.name}</span><span>${money(stock.price)}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><small>{stock.sector}</small></button>)}</div>
+              <div className="panel movers"><div className="card-title">Today’s Top Movers <button>{dataAgeMinutes !== null ? `${dataAgeMinutes}m ago` : '…'}</button></div>{movers.map((stock) => <button onClick={() => setSelectedSymbol(stock.symbol)} key={stock.symbol}><strong>{stock.symbol}</strong><svg viewBox="0 0 96 24"><path d={sparkPath(stock.chart, 96, 24)} /></svg><span>{stock.name}</span><span>${money(stock.price)}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><small>{stock.sector}</small></button>)}</div>
             </section>
 
             <section className="terminal-grid">
               <article className="panel dense-list catalyst-radar-wide"><div className="card-title">Catalyst Radar <button onClick={() => openCatalysts()}>{selected.symbol}</button></div>{catalystRadar.map((item) => <button className="radar-row" onClick={() => openCatalysts(item.text)} key={`${item.label}-${item.text}`}><strong>{item.label}</strong><span>{item.text}</span><b className={item.tone}>{item.type}</b></button>)}</article>
-              <article className="panel dense-list"><div className="card-title">Risk Matrix</div>{selected.risks.slice(0,4).map((item, index) => <p key={item}><strong>R{index + 1}</strong><span>{item}</span><b className="down">Watch</b></p>)}</article>
-              <article className="panel dense-list"><div className="card-title">Opportunity Matrix</div>{selected.opportunities.slice(0,4).map((item, index) => <p key={item}><strong>O{index + 1}</strong><span>{item}</span><b className="up">Open</b></p>)}</article>
+              <article className="panel dense-list"><div className="card-title">Risk Matrix</div>{selected.risks.slice(0, 4).map((item, index) => <p key={item}><strong>R{index + 1}</strong><span>{item}</span><b className="down">Watch</b></p>)}</article>
+              <article className="panel dense-list"><div className="card-title">Opportunity Matrix</div>{selected.opportunities.slice(0, 4).map((item, index) => <p key={item}><strong>O{index + 1}</strong><span>{item}</span><b className="up">Open</b></p>)}</article>
             </section>
           </section>
 
           <aside className={`right-stack ${detailPanel === 'catalysts' || detailPanel === 'research' ? 'catalyst-mode' : ''}`}>
-            {detailPanel === 'research' ? <section className="panel catalyst-workbench readout-workbench"><div className="card-title">{selected.symbol} Investment Readout <button onClick={closePanel}>Collapse</button></div><p className="workbench-note">Plain-English decision frame for the selected stock or market instrument.</p>{investmentReadout.map((item) => <button className="workbench-row" onClick={() => openPanel('report')} key={`${item.label}-${item.text}`}><span>{item.label}</span><strong>{item.text}</strong><b className={item.tone}>{item.value}</b></button>)}</section> : detailPanel === 'catalysts' ? <section className="panel catalyst-workbench"><div className="card-title">{selected.symbol} Catalyst Workbench <button onClick={closePanel}>Collapse</button></div>{activeCatalyst && <div className="focused-catalyst"><span>Focused catalyst</span><strong>{activeCatalyst.text}</strong><button onClick={() => openCatalystArticle(activeCatalyst.text)}>Open news</button></div>}<p className="workbench-note">Catalyst mode stays active as you change stocks. Click any item to open a live news search.</p>{catalystWorkbench.map((item) => <button className={`workbench-row ${activeCatalyst?.text === item.text ? 'active' : ''}`} onClick={() => { setFocusedCatalyst(item.text); openCatalystArticle(item.text) }} key={`${item.label}-${item.text}`}><span>{item.label}</span><strong>{item.text}</strong><b className={item.tone}>{item.type}</b></button>)}</section> : <>
+            {detailPanel === 'research' ? <section className="panel catalyst-workbench readout-workbench"><div className="card-title">{selected.symbol} Investment Readout <button onClick={closePanel}>Collapse</button></div><p className="workbench-note">Plain-English decision frame for the selected stock or market instrument.</p>{investmentReadout.map((item) => <button className="workbench-row" onClick={() => openPanel('report')} key={`${item.label}-${item.text}`}><span>{item.label}</span><strong>{item.text}</strong><b className={item.tone}>{item.value}</b></button>)}</section> : detailPanel === 'catalysts' ? <section className="panel catalyst-workbench"><div className="card-title">{selected.symbol} Catalyst Workbench <button onClick={closePanel}>Collapse</button></div>{activeCatalyst && <div className="focused-catalyst"><span>Focused catalyst</span><strong>{activeCatalyst.text}</strong><button onClick={() => openNewsSearch(activeCatalyst.text)}>Open news</button></div>}<p className="workbench-note">Catalyst mode stays active as you change stocks. Click any item to open a live news search.</p>{catalystWorkbench.map((item) => <button className={`workbench-row ${activeCatalyst?.text === item.text ? 'active' : ''}`} onClick={() => { setFocusedCatalyst(item.text); openNewsSearch(item.text) }} key={`${item.label}-${item.text}`}><span>{item.label}</span><strong>{item.text}</strong><b className={item.tone}>{item.type}</b></button>)}</section> : <>
+            {view === 'News' && <section className="panel news-panel"><div className="card-title">News Radar <button>{stocks.length} tickers</button></div><p className="workbench-note">Top catalyst per tracked name, sorted by today’s move. Each row opens a live news search in a new tab.</p>{[...stocks].sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).map((stock) => <button className="news-row" key={stock.symbol} onClick={() => openNewsSearch(stock.catalysts[0] || '', stock)}><strong>{stock.symbol}</strong><span>{stock.catalysts[0] || stock.thesis}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><em>↗</em></button>)}</section>}
+            {view === 'Portfolio' && <section className="panel holdings-editor">
+              <div className="card-title">Portfolio P&L <button onClick={addSelectedHolding} disabled={isMarketSelection || portfolio.positions.some((p) => p.symbol === selected.symbol)}>Track {selected.symbol}</button></div>
+              <div className="pl-summary">
+                <span>Market Value <b>${money(plSummary.value)}</b></span>
+                <span>Day P&L <b className={plSummary.dayPl >= 0 ? 'up' : 'down'}>{plSummary.dayPl >= 0 ? '+' : ''}${money(plSummary.dayPl)}</b></span>
+                <span>Total P&L <b className={plSummary.totalPl >= 0 ? 'up' : 'down'}>{plSummary.totalPl >= 0 ? '+' : ''}${money(plSummary.totalPl)} ({plSummary.totalPlPct >= 0 ? '+' : ''}{plSummary.totalPlPct.toFixed(1)}%)</b></span>
+                <span>Positions Sized <b>{plSummary.held}/{positions.length}</b></span>
+              </div>
+              {positions.map((position) => {
+                const holding = holdings[position.symbol]
+                const hasSize = holding && holding.shares > 0
+                const value = hasSize ? holding.shares * position.stock.price : 0
+                const pl = hasSize && holding.avgCost > 0 ? value - holding.shares * holding.avgCost : null
+                return <div className="holding-row" key={position.symbol}>
+                  <strong>{position.symbol}</strong>
+                  <label>Shares<input type="number" min="0" step="any" value={holding?.shares || ''} placeholder="0" onChange={(e) => updateHolding(position.symbol, { shares: Number(e.target.value) || 0 })} /></label>
+                  <label>Avg Cost<input type="number" min="0" step="any" value={holding?.avgCost || ''} placeholder="0.00" onChange={(e) => updateHolding(position.symbol, { avgCost: Number(e.target.value) || 0 })} /></label>
+                  <span className="holding-value">{hasSize ? `$${money(value)}` : `$${money(position.stock.price)}`}<b className={(pl ?? changeAmount(position.stock)) >= 0 ? 'up' : 'down'}>{pl !== null ? `${pl >= 0 ? '+' : ''}$${money(pl)}` : `${position.stock.change >= 0 ? '+' : ''}${position.stock.change.toFixed(2)}%`}</b></span>
+                  <button className="remove" title={`Stop tracking ${position.symbol}`} onClick={() => removeHolding(position.symbol)}>✕</button>
+                </div>
+              })}
+              <small>Share counts and cost basis live only in this browser (localStorage). The public site never stores or uploads them.</small>
+            </section>}
             <section className="panel catalyst-card"><div className="card-title">Catalyst Radar <button onClick={() => openCatalysts()}>{selected.symbol}</button></div>{catalystRadar.map((item) => <article key={`${selected.symbol}-${item.label}`} onClick={() => openCatalysts(item.text)}><span>{item.label}</span><strong>{item.text}</strong><b className={`${item.tone} badge`}>{item.type}</b></article>)}</section>
-            <section className="panel ai-card"><div className="ai-label">AI</div><div className="card-title">AI Research Summary <button>{sourceLabel(selected.dataSource)}</button></div><h2>{selected.symbol} <small>{selected.name}</small></h2><b className="rating">⌁ {selected.confidence > 82 ? 'Strong Bullish' : selected.confidence > 68 ? 'Constructive' : 'Watch Carefully'}</b><p>{view === 'News' ? selected.catalysts.join(' · ') : view === 'Portfolio' ? `${selected.symbol} portfolio exposure can be tracked here. Save it, monitor catalysts, and compare it against the rest of the watchlist.` : selected.thesis}</p><div className="drivers"><span>Key Drivers</span>{selected.opportunities.slice(0,3).map((item) => <em key={item}>● {item}</em>)}<em>● Price move today: {selected.change >= 0 ? '+' : ''}{selected.change.toFixed(2)}%</em></div><button onClick={() => openPanel('report')} className="full-report">View Full Research Report ›</button></section>
-            {view === 'Portfolio' && <section className="panel holdings-editor"><div className="card-title">Public Tracker <button onClick={addSelectedHolding}>Track {selected.symbol}</button></div>{positions.map((position) => <div className="holding-row public" key={position.symbol}><strong>{position.symbol}</strong><span>{position.stock ? `$${money(position.stock.price)}` : 'No quote'}</span><b className={position.stock && position.stock.change >= 0 ? 'up' : 'down'}>{position.stock ? `${position.stock.change >= 0 ? '+' : ''}${position.stock.change.toFixed(2)}%` : '—'}</b></div>)}<small>Only ticker symbols and market performance are stored here. Cash, share counts, cost basis, and personal portfolio values are intentionally not included.</small></section>}
-            <section className="panel risks"><div className="card-title">Risks & Opportunities <button onClick={() => openPanel('risks')}>View all</button></div><h3>Opportunities</h3>{selected.opportunities.slice(0,2).map((item) => <p className="good" key={item}>● {item}</p>)}<h3>Risks</h3>{selected.risks.slice(0,2).map((item) => <p className="bad" key={item}>● {item}</p>)}<div className="signal-row"><span>Conviction <b>{selected.confidence}/100</b></span><span>Rating <b>{selected.rating || 'Watch'}</b></span></div>{!isMarketSelection && <button onClick={toggleSave} className="save">★ {inPortfolio ? 'Saved to Portfolio' : 'Save to Portfolio'}</button>}</section>
-            <section className="panel market-summary"><div className="card-title">Market Summary <button onClick={() => setSelectedSymbol(marketSummary.symbol)}>{marketSummary.symbol}</button></div><strong>{marketSummary.name}<br/>{marketSummary.symbol === '10Y' ? `${money(marketSummary.price)}%` : marketSummary.price >= 1000 ? marketSummary.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : money(marketSummary.price)}</strong><span className={marketSummary.change >= 0 ? 'up' : 'down'}>{marketSummary.change >= 0 ? '+' : ''}{marketSummary.change.toFixed(2)}%</span><svg viewBox="0 0 230 72"><path d={sparkPath(marketSummary.chart, 230, 72)} /></svg><div className="breadth"><span>Advancing <b>{marketBreadth.advancing}</b></span><span>Declining <b>{marketBreadth.declining}</b></span><span>Unchanged <b>{marketBreadth.unchanged}</b></span></div><div className="bar"><i/><i/><i/></div></section>
+            {view === 'Research' && <section className="panel ai-card"><div className="ai-label">AI</div><div className="card-title">Research Summary <button>{selected.kind === 'instrument' ? 'Macro' : 'Equity'}</button></div><h2>{selected.symbol} <small>{selected.name}</small></h2><b className="rating">⌁ {selected.confidence > 82 ? 'Strong Bullish' : selected.confidence > 68 ? 'Constructive' : 'Watch Carefully'}</b><p>{selected.thesis}</p><div className="drivers"><span>Key Drivers</span>{selected.opportunities.slice(0, 3).map((item) => <em key={item}>● {item}</em>)}<em>● Price move today: {selected.change >= 0 ? '+' : ''}{selected.change.toFixed(2)}%</em></div><button onClick={() => openPanel('report')} className="full-report">View Full Research Report ›</button></section>}
+            <section className="panel risks"><div className="card-title">Risks & Opportunities <button onClick={() => openPanel('risks')}>View all</button></div><h3>Opportunities</h3>{selected.opportunities.slice(0, 2).map((item) => <p className="good" key={item}>● {item}</p>)}<h3>Risks</h3>{selected.risks.slice(0, 2).map((item) => <p className="bad" key={item}>● {item}</p>)}<div className="signal-row"><span>Conviction <b>{selected.confidence}/100</b></span><span>Rating <b>{selected.rating || 'Watch'}</b></span></div>{!isMarketSelection && <button onClick={toggleStar} className="save">{isStarred ? '★ Starred' : '☆ Add to Starred'}</button>}</section>
+            {view === 'Research' && marketSummary && <section className="panel market-summary"><div className="card-title">Market Summary <button onClick={() => setSelectedSymbol(marketSummary.symbol)}>{marketSummary.symbol}</button></div><strong>{marketSummary.name}<br />{bigNumber(marketSummary.price)}</strong><span className={marketSummary.change >= 0 ? 'up' : 'down'}>{marketSummary.change >= 0 ? '+' : ''}{marketSummary.change.toFixed(2)}%</span><svg viewBox="0 0 230 72"><path d={sparkPath(marketSummary.chart, 230, 72)} /></svg><div className="breadth"><span>Advancing <b>{marketBreadth.advancing}</b></span><span>Declining <b>{marketBreadth.declining}</b></span><span>Unchanged <b>{marketBreadth.unchanged}</b></span></div><div className="bar"><i style={{ flex: marketBreadth.advancing / breadthTotal }} /><i style={{ flex: marketBreadth.declining / breadthTotal }} /><i style={{ flex: Math.max(0.02, marketBreadth.unchanged / breadthTotal) }} /></div></section>}
             </>}
           </aside>
         </div>
         {detailPanel && detailPanel !== 'research' && detailPanel !== 'catalysts' && <section className="detail-drawer panel">
-          <div className="drawer-head"><div><span className="eyebrow">Command detail</span><h2>{detailPanel === 'report' ? `${selected.symbol} Full Research Report` : detailPanel === 'risks' ? 'Risks & Opportunities' : 'Tracked StockBot Watchlist'}</h2></div><button onClick={closePanel}>Close ×</button></div>
-          {detailPanel === 'report' && <div className="drawer-grid report-view"><article><h3>Thesis</h3><p>{selected.thesis}</p><dl><dt>Conviction</dt><dd>{selected.confidence}/100</dd><dt>Sector</dt><dd>{selected.sector}</dd><dt>Market cap</dt><dd>{selected.marketCap}</dd><dt>Rating</dt><dd>{selected.rating || 'Watch'}</dd><dt>Target</dt><dd>{selected.targetPrice ? `$${money(selected.targetPrice)}` : '—'}</dd></dl></article><article><h3>Catalysts</h3>{selected.catalysts.map((item) => <p key={item}>● {item}</p>)}<h3>Key drivers</h3>{selected.opportunities.map((item) => <p className="good" key={item}>+ {item}</p>)}</article><article><h3>Risk checklist</h3>{selected.risks.map((item) => <p className="bad" key={item}>− {item}</p>)}<button onClick={() => setView('Portfolio')} className="drawer-action">Track in public watchlist</button></article></div>}
+          <div className="drawer-head"><div><span className="eyebrow">Command detail</span><h2>{detailPanel === 'report' ? `${selected.symbol} Full Research Report` : detailPanel === 'risks' ? 'Risks & Opportunities' : 'Tracked Watchlist'}</h2></div><button onClick={closePanel}>Close ×</button></div>
+          {detailPanel === 'report' && <div className="drawer-grid report-view"><article><h3>Thesis</h3><p>{selected.thesis}</p><dl><dt>Conviction</dt><dd>{selected.confidence}/100</dd><dt>Sector</dt><dd>{selected.sector}</dd><dt>52W range</dt><dd>{selected.range52w ? `${money(selected.range52w[0])} – ${money(selected.range52w[1])}` : '—'}</dd><dt>Rating</dt><dd>{selected.rating || 'Watch'}</dd><dt>Exchange</dt><dd>{selected.exchange || '—'}</dd></dl></article><article><h3>Catalysts</h3>{selected.catalysts.map((item) => <p key={item}>● {item}</p>)}<h3>Key drivers</h3>{selected.opportunities.map((item) => <p className="good" key={item}>+ {item}</p>)}</article><article><h3>Risk checklist</h3>{selected.risks.map((item) => <p className="bad" key={item}>− {item}</p>)}<button onClick={() => setView('Portfolio')} className="drawer-action">Open portfolio view</button></article></div>}
           {detailPanel === 'risks' && <div className="drawer-grid"><article><h3>Risks</h3>{selected.risks.map((item) => <p className="bad" key={item}>● {item}</p>)}</article><article><h3>Opportunities</h3>{selected.opportunities.map((item) => <p className="good" key={item}>● {item}</p>)}</article><article><h3>Decision frame</h3><p>Use this panel as the quick checklist for whether news changes the story. If a catalyst validates an opportunity, the stock deserves attention. If a risk moves from theoretical to active, it belongs on the watch list.</p></article></div>}
           {detailPanel === 'watchlist' && <div className="drawer-table watchlist-table">{filtered.map((stock) => <button key={stock.symbol} onClick={() => { setSelectedSymbol(stock.symbol); setDetailPanel('report') }}><strong>{stock.symbol}</strong><span>{stock.name}</span><span>${money(stock.price)}</span><b className={stock.change >= 0 ? 'up' : 'down'}>{stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%</b><small>{stock.sector}</small></button>)}</div>}
         </section>}
