@@ -1,33 +1,46 @@
 # Stock Command Center
 
-A static GitHub Pages market-command-center dashboard for StockBot's portfolio intelligence.
+A static GitHub Pages market dashboard: dark command-center UI with a watchlist,
+real OHLCV charts, sector heatmap, market instruments strip, catalysts, research
+summaries, a news radar, and a private portfolio P&L tracker.
 
-## Features
+Live: https://jz237.github.io/stock-command-center/
 
-- Dark command-center UI with watchlist, live quote panel, sector heatmap, catalysts, AI research summary, risks, opportunities, portfolio widgets, allocation, movers, and market summary.
-- Client-side free live pricing refresh via Yahoo Finance chart data, with visible static-data fallback if the browser/API blocks a request.
-- StockBot-backed JSON seed data in `public/data/stocks.json` and `public/data/portfolio.json`.
-- `scripts/export_site_data.py` exports StockBot workspace files into the static site data payload.
-- User-added tickers and saved portfolio symbols persist in `localStorage`, so the static site needs no backend secrets.
-- Built with Vite, React, and TypeScript.
+## How data works
+
+GitHub Pages is static hosting, and the free market-data APIs (Yahoo Finance
+chart API, Cboe, etc.) do **not** send CORS headers, so the browser can never
+call them directly. All market data therefore flows through JSON files
+produced server-side by GitHub Actions:
+
+- `data/stocks.json` (mirrored to `public/data/`) — quotes for 18 equities plus
+  9 market instruments (S&P, NASDAQ, DOW, VIX, 10Y, DXY, BTC, WTI, GOLD):
+  price, day change, previous close, day range, 52-week range, volume, and a
+  60-day sparkline of real closes. Refreshed every 30 minutes during NYSE hours
+  by `.github/workflows/update-prices.yml` and committed.
+- `public/data/history.json` — real OHLCV bars per symbol (5-minute, 30-minute,
+  daily, weekly, monthly) powering every chart range. Rebuilt on each deploy
+  but **not** committed each run (it is ~1.2 MB); the checked-in copy is a seed
+  for local development.
+- `data/portfolio.json` — tracked symbols only. Share counts and cost basis
+  entered in the Portfolio view stay in the visitor's `localStorage`; nothing
+  personal is published.
+
+Both update scripts validate everything they fetch (price inside the 52-week
+range, sane day-change caps, fresh quote timestamps, cross-checks between
+intraday and daily series) and refuse to write anything if any symbol fails,
+so bad upstream data can never silently land in a commit.
 
 ## Local development
 
 ```bash
 npm install
-python3 scripts/export_site_data.py  # optional: refresh from StockBot workspace
+npm run update-prices -- --force  # refresh quotes (any time of day)
+npm run update-history            # refresh chart history
 npm run dev
-npm run build
+npm run build && npm run lint
 ```
 
-## Data flow
+## Stack
 
-1. Static JSON loads first so the site is fast and works on GitHub Pages.
-2. The browser attempts to refresh prices/charts from Yahoo Finance every two minutes.
-3. If the live feed fails, the dashboard keeps working from StockBot's cached data and shows `Static fallback data`.
-
-## Next upgrades
-
-- Add a serverless price proxy if Yahoo blocks CORS/rate limits in production.
-- Replace decorative market-summary data with a real index/breadth feed.
-- Add per-ticker notes, holdings editing, and generated full research report pages.
+Vite + React 19 + TypeScript, charts by `lightweight-charts` v5.
