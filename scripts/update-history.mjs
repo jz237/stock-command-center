@@ -1,143 +1,106 @@
-import fs from 'node:fs/promises'
+// Regenerates public/data/history.json + data/history.json with REAL OHLCV
+// candles from the Yahoo Finance chart API (server-side only; not CORS-open).
+//
+// Per symbol it stores five real series, keyed by the Yahoo data symbol:
+//   i1d  — 5-minute bars, current/last session   (chart range 1D)
+//   i5d  — 30-minute bars, last five sessions    (chart range 5D)
+//   d1y  — daily bars, one year                  (ranges 1M/3M/6M/YTD/1Y, sliced client-side)
+//   w5y  — weekly bars, five years               (range 5Y)
+//   mmax — monthly bars, full listing history    (range MAX)
+//
+// Rows are stored as compact arrays [time, open, high, low, close, volume].
+// Nothing is interpolated or "densified" — bars come straight from the API,
+// and bars with missing OHLC data are dropped.
+//
+// Validation is strict: if ANY symbol/series fails, nothing is written and the
+// script exits non-zero, so stale-but-consistent data is never replaced by
+// partial garbage.
+
+import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { fetchChart, extractRows, sleep } from './yahoo.mjs'
 
-const siteRoot = process.cwd()
-const stockbotRoot = path.resolve(siteRoot, '..')
-const priceHistoryPath = path.join(stockbotRoot, 'price_history.json')
-const priceHistory = JSON.parse(await fs.readFile(priceHistoryPath, 'utf8'))
+const root = process.cwd()
+const stocksFile = path.join(root, 'data', 'stocks.json')
+const outputFiles = [
+  path.join(root, 'data', 'history.json'),
+  path.join(root, 'public', 'data', 'history.json'),
+]
 
-const ranges = ['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', '5Y', 'MAX']
-const rangeConfig = {
-  '1D': { points: 78, days: 1, drift: 0.004, volatility: 0.22 },
-  '5D': { points: 55, days: 5, drift: 0.012, volatility: 0.45 },
-  '1M': { points: 31, days: 30, drift: 0.028, volatility: 0.7 },
-  '3M': { points: 78, days: 90, drift: 0.055, volatility: 0.85 },
-  '6M': { points: 96, days: 180, drift: 0.09, volatility: 1.0 },
-  YTD: { points: 110, days: 130, drift: 0.12, volatility: 1.1 },
-  '1Y': { points: 126, days: 365, drift: 0.18, volatility: 1.25 },
-  '5Y': { points: 150, days: 365 * 5, drift: 0.52, volatility: 1.55 },
-  MAX: { points: 170, days: 365 * 8, drift: 0.9, volatility: 1.8 },
+const SERIES = [
+  { key: 'i1d', range: '1d', interval: '5m', dateOnly: false, minRows: 5 },
+  { key: 'i5d', range: '5d', interval: '30m', dateOnly: false, minRows: 20 },
+  { key: 'd1y', range: '1y', interval: '1d', dateOnly: true, minRows: 30 },
+  { key: 'w5y', range: '5y', interval: '1wk', dateOnly: true, minRows: 20 },
+  { key: 'mmax', range: 'max', interval: '1mo', dateOnly: true, minRows: 6 },
+]
+
+function toCompact(rows) {
+  return rows.map((row) => [row.time, row.open, row.high, row.low, row.close, row.volume])
 }
 
-function uniqueRows(symbol) {
-  const byDate = new Map()
-  for (const row of priceHistory[symbol] || []) {
-    if (row?.date && Number.isFinite(Number(row.price))) byDate.set(row.date, row)
+async function fetchSymbolHistory(displaySymbol, dataSymbol) {
+  const series = {}
+  for (const spec of SERIES) {
+    const result = await fetchChart(dataSymbol, spec.range, spec.interval)
+    const rows = extractRows(result, { dateOnly: spec.dateOnly })
+    if (rows.length < spec.minRows) {
+      throw new Error(`${displaySymbol} ${spec.key}: only ${rows.length} usable bars (need ${spec.minRows})`)
+    }
+    series[spec.key] = rows
+    await sleep(150)
   }
-  return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, row]) => row)
+
+  // Cross-series sanity: the latest daily close must agree with the latest
+  // intraday close to within 30% — catches symbol mix-ups and split glitches.
+  const lastDaily = series.d1y.at(-1).close
+  const lastIntraday = series.i1d.at(-1).close
+  if (Math.abs(lastDaily - lastIntraday) / lastIntraday > 0.3) {
+    throw new Error(`${displaySymbol}: daily close ${lastDaily} disagrees >30% with intraday close ${lastIntraday}`)
+  }
+
+  return Object.fromEntries(SERIES.map(({ key }) => [key, toCompact(series[key])]))
 }
 
-function valueFromSource(prices, index, points, latest, config, symbol) {
-  const t = index / Math.max(points - 1, 1)
-  const sourceIndex = Math.min(prices.length - 1, Math.round(t * (prices.length - 1)))
-  const sourceLast = prices.at(-1) || latest
-  const sourceMove = ((prices[sourceIndex] || sourceLast) - sourceLast) / Math.max(sourceLast, 1)
-  const wave = Math.sin(index * 0.72 + symbol.charCodeAt(0)) * 0.006 + Math.cos(index * 0.19 + symbol.length) * 0.004
-  const historicalDiscount = config.drift * (1 - t)
-  const close = latest * (1 + sourceMove * config.volatility + wave - historicalDiscount)
-  return Number((index === points - 1 ? latest : Math.max(close, latest * 0.12)).toFixed(2))
-}
+async function main() {
+  const payload = JSON.parse(await readFile(stocksFile, 'utf8'))
+  const stocks = Array.isArray(payload) ? payload : payload.stocks || []
+  if (!stocks.length) {
+    console.error('data/stocks.json has no symbols; aborting.')
+    process.exit(1)
+  }
 
-function buildRangeRows(symbol, sourceRows, range) {
-  if (range === '5D') return buildFiveDayRows(symbol, sourceRows)
+  const history = {
+    updatedAt: new Date().toISOString(),
+    source: 'yahoo-finance-chart',
+    format: '[time, open, high, low, close, volume]; i*=unix seconds, others=YYYY-MM-DD',
+    symbols: {},
+  }
 
-  const config = rangeConfig[range]
-  const prices = sourceRows.map((row) => Number(row.price)).filter(Number.isFinite)
-  const latest = prices.at(-1)
-  const latestDate = new Date(`${sourceRows.at(-1).date}T16:00:00Z`)
-  const closes = Array.from({ length: config.points }, (_, index) => valueFromSource(prices, index, config.points, latest, config, symbol))
-
-  return closes.map((close, index) => {
-    let time
-    if (range === '1D') {
-      const marketOpen = new Date(`${sourceRows.at(-1).date}T13:30:00Z`)
-      time = Math.floor((marketOpen.getTime() + index * 5 * 60 * 1000) / 1000)
-    } else {
-      const date = new Date(latestDate)
-      date.setDate(latestDate.getDate() - Math.round(config.days * (1 - index / Math.max(config.points - 1, 1))))
-      time = date.toISOString().slice(0, 10)
-    }
-    const open = index === 0 ? close : closes[index - 1]
-    const spread = Math.max(Math.abs(close - open) * 0.65, close * 0.004)
-    const high = Math.max(open, close) + spread * (0.8 + (index % 5) * 0.08)
-    const low = Math.min(open, close) - spread * (0.72 + (index % 4) * 0.07)
-    return {
-      time,
-      open: Number(open.toFixed(2)),
-      high: Number(high.toFixed(2)),
-      low: Number(low.toFixed(2)),
-      close: Number(close.toFixed(2)),
-      value: Number(close.toFixed(2)),
-      volume: Math.round(600_000 + Math.abs(close - open) * 140_000 + (index % 9) * 85_000),
-    }
-  })
-}
-
-function buildFiveDayRows(symbol, sourceRows) {
-  const days = sourceRows.slice(-5)
-  const rowsPerDay = 11
-  const closes = []
-
-  days.forEach((day, dayIndex) => {
-    const dayClose = Number(day.price)
-    const previousClose = dayIndex === 0 ? dayClose : Number(days[dayIndex - 1].price)
-    for (let slot = 0; slot < rowsPerDay; slot += 1) {
-      const t = slot / Math.max(rowsPerDay - 1, 1)
-      const wave = slot === rowsPerDay - 1 ? 0 : Math.sin((dayIndex * rowsPerDay + slot) * 0.9 + symbol.charCodeAt(0)) * 0.0025
-      const close = previousClose + (dayClose - previousClose) * t + dayClose * wave
-      closes.push({ date: day.date, close: Number((slot === rowsPerDay - 1 ? dayClose : close).toFixed(2)) })
-    }
-  })
-
-  return closes.map((point, index) => {
-    const slot = index % rowsPerDay
-    const marketOpen = new Date(`${point.date}T13:30:00Z`)
-    const time = Math.floor((marketOpen.getTime() + slot * 39 * 60 * 1000) / 1000)
-    const close = point.close
-    const open = index === 0 ? close : closes[index - 1].close
-    const spread = Math.max(Math.abs(close - open) * 0.65, close * 0.0035)
-    const high = Math.max(open, close) + spread * (0.8 + (index % 5) * 0.08)
-    const low = Math.min(open, close) - spread * (0.72 + (index % 4) * 0.07)
-    return {
-      time,
-      open: Number(open.toFixed(2)),
-      high: Number(high.toFixed(2)),
-      low: Number(low.toFixed(2)),
-      close: Number(close.toFixed(2)),
-      value: Number(close.toFixed(2)),
-      volume: Math.round(650_000 + Math.abs(close - open) * 150_000 + (index % 7) * 95_000),
-    }
-  })
-}
-
-const history = { updatedAt: new Date().toISOString(), source: 'StockBot cached prices, densified for chart ranges', stocks: {} }
-
-for (const symbol of Object.keys(priceHistory).sort()) {
-  const rows = uniqueRows(symbol)
-  if (rows.length < 2) continue
-  history.stocks[symbol] = {}
-  for (const range of ranges) history.stocks[symbol][range] = buildRangeRows(symbol, rows, range)
-}
-
-for (const rel of ['public/data/history.json', 'data/history.json']) {
-  await fs.mkdir(path.dirname(path.join(siteRoot, rel)), { recursive: true })
-  await fs.writeFile(path.join(siteRoot, rel), `${JSON.stringify(history, null, 2)}\n`)
-}
-
-for (const rel of ['public/data/stocks.json', 'data/stocks.json']) {
-  const file = path.join(siteRoot, rel)
-  const payload = JSON.parse(await fs.readFile(file, 'utf8'))
-  const stocks = Array.isArray(payload) ? payload : payload.stocks
+  const failures = []
   for (const stock of stocks) {
-    const rows = uniqueRows(stock.symbol)
-    if (!rows.length) continue
-    const latest = rows.at(-1)
-    stock.price = Number(Number(latest.price).toFixed(2))
-    if (latest.change_pct !== undefined && latest.change_pct !== null) stock.change = Number(Number(latest.change_pct).toFixed(2))
-    stock.chart = rows.map((row) => Number(Number(row.price).toFixed(2)))
-    stock.dataSource = 'stockbot'
+    const dataSymbol = stock.dataSymbol || stock.symbol
+    try {
+      history.symbols[dataSymbol] = await fetchSymbolHistory(stock.symbol, dataSymbol)
+      const bars = Object.values(history.symbols[dataSymbol]).reduce((n, rows) => n + rows.length, 0)
+      console.log(`ok   ${stock.symbol.padEnd(7)} ${bars} bars`)
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error))
+      console.error(`FAIL ${stock.symbol.padEnd(7)} ${error instanceof Error ? error.message : error}`)
+    }
   }
-  await fs.writeFile(file, `${JSON.stringify(payload, null, 2)}\n`)
+
+  if (failures.length) {
+    console.error(`\n${failures.length}/${stocks.length} symbol(s) failed — refusing to write partial history.`)
+    process.exit(1)
+  }
+
+  const output = JSON.stringify(history) // compact on purpose: ~25k bars
+  await Promise.all(outputFiles.map((file) => writeFile(file, output)))
+  console.log(`\nWrote real OHLCV history for ${Object.keys(history.symbols).length} symbols (${(output.length / 1024 / 1024).toFixed(1)} MB).`)
 }
 
-console.log(`Wrote StockBot-densified history for ${Object.keys(history.stocks).length} symbols`)
+main().catch((error) => {
+  console.error(error)
+  process.exit(1)
+})
