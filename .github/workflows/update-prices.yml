@@ -44,6 +44,11 @@ jobs:
         with:
           commit_message: 'chore: refresh stock prices'
           file_pattern: 'data/stocks.json public/data/stocks.json'
+      # history.json (~1.2 MB of OHLCV bars) is rebuilt for the deploy artifact
+      # but intentionally NOT committed — committing it every 30 minutes would
+      # bloat the repo. The checked-in copy is a seed for local development.
+      - name: Refresh chart history for the deploy artifact
+        run: npm run update-history
       - name: Build updated site
         run: npm run build
       - name: Upload Pages artifact
