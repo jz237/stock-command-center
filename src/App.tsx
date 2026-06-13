@@ -523,7 +523,7 @@ function App() {
   return (
     <main className="terminal">
       <nav className="rail">
-        <a className="home-link" href="https://jz237.github.io/jez237-site/?v=3fee6936" title="Back to homepage" aria-label="Back to homepage"><span>⌂</span><b>Home</b></a>
+        <a className="home-link" href="https://jez237.com/" title="Back to homepage" aria-label="Back to homepage"><span>⌂</span><b>Home</b></a>
         <button title="Watchlist table" onClick={() => openPanel('watchlist')}>▦</button>
         <button title="Full research report" className="hot" onClick={() => openPanel('report')}>▧</button>
         <button title="Catalyst workbench" onClick={() => openCatalysts()}>▤</button>
