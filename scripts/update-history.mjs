@@ -18,7 +18,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fetchChart, extractRows, sleep } from './yahoo.mjs'
+import { fetchChart, extractRows, isoDate, sleep } from './yahoo.mjs'
 
 const root = process.cwd()
 const stocksFile = path.join(root, 'data', 'stocks.json')
@@ -39,11 +39,37 @@ function toCompact(rows) {
   return rows.map((row) => [row.time, row.open, row.high, row.low, row.close, row.volume])
 }
 
+function latestSessionRows(result) {
+  const rows = extractRows(result)
+  const gmtoffset = result.meta?.gmtoffset || 0
+  const latestDate = rows.at(-1) ? isoDate(rows.at(-1).time, gmtoffset) : null
+  if (!latestDate) return rows
+  return rows.filter((row) => isoDate(row.time, gmtoffset) === latestDate)
+}
+
+async function fetchSeriesRows(displaySymbol, dataSymbol, spec) {
+  const result = await fetchChart(dataSymbol, spec.range, spec.interval)
+  let rows = extractRows(result, { dateOnly: spec.dateOnly })
+
+  // Some Yahoo index/rate symbols, notably ^TNX, can return an empty 1d/5m
+  // chart while 5d/30m is healthy. Use the latest session from that feed so
+  // one thin intraday source does not block the whole Pages deploy.
+  if (rows.length < spec.minRows && spec.key === 'i1d') {
+    const fallback = await fetchChart(dataSymbol, '5d', '30m')
+    const fallbackRows = latestSessionRows(fallback)
+    if (fallbackRows.length >= spec.minRows) {
+      console.warn(`warn ${displaySymbol.padEnd(7)} using 5d/30m latest-session fallback for i1d`)
+      rows = fallbackRows
+    }
+  }
+
+  return rows
+}
+
 async function fetchSymbolHistory(displaySymbol, dataSymbol) {
   const series = {}
   for (const spec of SERIES) {
-    const result = await fetchChart(dataSymbol, spec.range, spec.interval)
-    const rows = extractRows(result, { dateOnly: spec.dateOnly })
+    const rows = await fetchSeriesRows(displaySymbol, dataSymbol, spec)
     if (rows.length < spec.minRows) {
       throw new Error(`${displaySymbol} ${spec.key}: only ${rows.length} usable bars (need ${spec.minRows})`)
     }
