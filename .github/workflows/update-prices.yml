@@ -2,10 +2,6 @@ name: Refresh stock prices
 
 on:
   workflow_dispatch:
-  schedule:
-    # Broad UTC window covering 9:30 AM–4:00 PM New York time across DST changes.
-    # scripts/update-prices.mjs enforces exact NYSE weekdays, holidays, and regular-session hours.
-    - cron: '*/30 13-21 * * 1-5'
 
 permissions:
   contents: write
